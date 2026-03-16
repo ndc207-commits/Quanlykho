@@ -93,7 +93,9 @@ def highlight_low(x):
 if menu=="Kho hàng":
     st.header("Tồn kho theo từng kho")
     df_stock = refresh_stock()
-    st.dataframe(df_stock.style.apply(highlight_low, axis=None))
+    st.dataframe(
+    df_stock.style.applymap(lambda x: 'background-color: #FFAAAA' if x<5 else '', subset=["Số lượng"])
+)
 
 # ==== Thêm sản phẩm ====
 elif menu=="Thêm sản phẩm":
