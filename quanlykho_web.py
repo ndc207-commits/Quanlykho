@@ -1,11 +1,11 @@
-# inventory_web_full_pro5.py
+# inventory_web_full_pro5_1.py
 import streamlit as st
 import sqlite3
 from datetime import datetime, timedelta
 import pandas as pd
 
 # ==== Kết nối Database ====
-conn = sqlite3.connect("inventory_web_full_pro5.db", check_same_thread=False)
+conn = sqlite3.connect("inventory_web_full_pro5_1.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ==== Tạo bảng nếu chưa có ====
@@ -14,8 +14,15 @@ CREATE TABLE IF NOT EXISTS products(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 sku TEXT UNIQUE,
 name TEXT,
-quantity INTEGER,
 created_at TEXT
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS stock_by_warehouse(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+product_id INTEGER,
+warehouse TEXT,
+quantity INTEGER
 )
 """)
 cursor.execute("""
@@ -39,13 +46,12 @@ role TEXT
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS warehouses(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
-name TEXT,
-location TEXT
+name TEXT
 )
 """)
 conn.commit()
 
-# ==== Thêm dữ liệu mẫu ====
+# ==== Dữ liệu mẫu ====
 cursor.execute("SELECT COUNT(*) FROM employees")
 if cursor.fetchone()[0]==0:
     employees = [("Admin","Manager"), ("Hanh","Staff"), ("Linh","Staff")]
@@ -54,19 +60,30 @@ if cursor.fetchone()[0]==0:
 
 cursor.execute("SELECT COUNT(*) FROM warehouses")
 if cursor.fetchone()[0]==0:
-    warehouses = [("Kho La Pagode","Metz"), ("Kho Muse","Muse"), ("Kho Metz Vilee","Metz Ville"), ("Kho Nancy","Nancy")]
-    cursor.executemany("INSERT INTO warehouses(name, location) VALUES (?,?)", warehouses)
+    warehouses = [("Kho La Pagode",), ("Kho Muse",), ("Kho Metz Ville",), ("Kho Nancy",)]
+    cursor.executemany("INSERT INTO warehouses(name) VALUES (?)", warehouses)
     conn.commit()
 
 # ==== Sidebar menu ====
-st.sidebar.title("Quản Lý Kho Amme Thé")
+st.sidebar.title("QUẢN LÝ KHO AMME THE")
 menu = st.sidebar.radio("Điều hướng", ["Kho hàng","Thêm sản phẩm","Cập nhật/Xóa sản phẩm","Nhập/Xuất","Báo cáo hàng sắp hết","Lịch sử giao dịch","Xuất Excel"])
 
 # ==== Hàm tiện ích ====
 def refresh_products():
     cursor.execute("SELECT * FROM products")
     rows = cursor.fetchall()
-    df = pd.DataFrame(rows, columns=["ID","SKU","Tên sản phẩm","Số lượng","Ngày tạo"])
+    df = pd.DataFrame(rows, columns=["ID","SKU","Tên sản phẩm","Ngày tạo"])
+    return df
+
+def refresh_stock():
+    cursor.execute("""
+    SELECT p.id, p.sku, p.name, w.name as Kho, IFNULL(s.quantity,0) as Số_lượng
+    FROM products p
+    CROSS JOIN warehouses w
+    LEFT JOIN stock_by_warehouse s ON p.id=s.product_id AND s.warehouse=w.name
+    """)
+    rows = cursor.fetchall()
+    df = pd.DataFrame(rows, columns=["ID","SKU","Tên sản phẩm","Kho","Số lượng"])
     return df
 
 def highlight_low(x):
@@ -74,21 +91,20 @@ def highlight_low(x):
 
 # ==== Kho hàng ====
 if menu=="Kho hàng":
-    st.header("Danh sách sản phẩm")
-    df = refresh_products()
-    st.dataframe(df.style.apply(highlight_low, axis=None))
+    st.header("Tồn kho theo từng kho")
+    df_stock = refresh_stock()
+    st.dataframe(df_stock.style.apply(highlight_low, axis=None))
 
 # ==== Thêm sản phẩm ====
 elif menu=="Thêm sản phẩm":
     st.header("Thêm sản phẩm mới")
     sku = st.text_input("Mã sản phẩm (SKU)")
     name = st.text_input("Tên sản phẩm")
-    qty = st.number_input("Số lượng ban đầu", min_value=0, step=1)
     if st.button("Thêm sản phẩm"):
         if sku and name:
             try:
-                cursor.execute("INSERT INTO products(sku,name,quantity,created_at) VALUES (?,?,?,?)",
-                               (sku,name,qty,datetime.now().strftime("%Y-%m-%d")))
+                cursor.execute("INSERT INTO products(sku,name,created_at) VALUES (?,?,?)",
+                               (sku,name,datetime.now().strftime("%Y-%m-%d")))
                 conn.commit()
                 st.success(f"Thêm sản phẩm {name} thành công!")
             except sqlite3.IntegrityError:
@@ -116,6 +132,7 @@ elif menu=="Cập nhật/Xóa sản phẩm":
         with col2:
             if st.button("Xóa sản phẩm"):
                 cursor.execute("DELETE FROM products WHERE id=?",(pid,))
+                cursor.execute("DELETE FROM stock_by_warehouse WHERE product_id=?",(pid,))
                 conn.commit()
                 st.success(f"Đã xóa sản phẩm {product}!")
 
@@ -129,33 +146,58 @@ elif menu=="Nhập/Xuất":
         product = st.selectbox("Chọn sản phẩm", df["Tên sản phẩm"])
         pid = df[df["Tên sản phẩm"]==product]["ID"].values[0]
         type_tx = st.radio("Loại giao dịch", ["Nhập","Xuất"])
-        qty = st.number_input("Số lượng", min_value=1, step=1)
-        employees_list = st.multiselect("Nhân viên", [row[0] for row in cursor.execute("SELECT name FROM employees").fetchall()], default=["Hanh"])
-        warehouses_list = st.multiselect("Kho", [row[0] for row in cursor.execute("SELECT name FROM warehouses").fetchall()], default=["Kho La Pagode"])
+        qty = st.number_input("Số lượng mỗi kho", min_value=1, step=1)
+        employees_list = st.multiselect(
+            "Nhân viên thực hiện",
+            [row[0] for row in cursor.execute("SELECT name FROM employees").fetchall()],
+            default=["Hanh"]
+        )
+        warehouses_list = st.multiselect(
+            "Kho thực hiện",
+            [row[0] for row in cursor.execute("SELECT name FROM warehouses").fetchall()],
+            default=["Kho La Pagode"]
+        )
+
         if st.button("Xác nhận"):
+            if type_tx=="Xuất":
+                # Kiểm tra tổng tồn tất cả kho
+                cursor.execute("SELECT IFNULL(SUM(quantity),0) FROM stock_by_warehouse WHERE product_id=?",(pid,))
+                total_qty = cursor.fetchone()[0]
+                total_needed = qty * len(warehouses_list)
+                if total_needed > total_qty:
+                    st.error(f"Không đủ hàng để xuất! Tồn tổng {total_qty}, cần {total_needed}")
+                    st.stop()
             for emp in employees_list:
                 for wh in warehouses_list:
-                    if type_tx=="Nhập":
-                        cursor.execute("UPDATE products SET quantity=quantity+? WHERE id=?",(qty,pid))
+                    # Cập nhật stock_by_warehouse
+                    cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?",(pid,wh))
+                    res = cursor.fetchone()
+                    if res:
+                        current_qty = res[0]
+                        new_qty = current_qty + qty if type_tx=="Nhập" else current_qty - qty
+                        cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?",
+                                       (new_qty,pid,wh))
                     else:
-                        if cursor.execute("SELECT quantity FROM products WHERE id=?",(pid,)).fetchone()[0]<qty:
-                            st.error("Không đủ hàng để xuất!")
+                        if type_tx=="Nhập":
+                            cursor.execute("INSERT INTO stock_by_warehouse(product_id,warehouse,quantity) VALUES (?,?,?)",
+                                           (pid,wh,qty))
+                        else:
+                            st.error(f"Kho {wh} chưa có sản phẩm này!")
                             st.stop()
-                        cursor.execute("UPDATE products SET quantity=quantity-? WHERE id=?",(qty,pid))
-                    cursor.execute("INSERT INTO history(product_id,type,quantity,date,employee,warehouse) VALUES (?,?,?,?,?,?)",
-                                   (pid,type_tx,qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),emp,wh))
+                    # Lưu lịch sử
+                    for emp in employees_list:
+                        cursor.execute(
+                            "INSERT INTO history(product_id,type,quantity,date,employee,warehouse) VALUES (?,?,?,?,?,?)",
+                            (pid,type_tx,qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),emp,wh)
+                        )
             conn.commit()
-            st.success(f"{type_tx} thành công {qty} sản phẩm {product}")
+            st.success(f"{type_tx} thành công {qty} sản phẩm '{product}' cho {len(warehouses_list)} kho và {len(employees_list)} nhân viên.")
 
 # ==== Báo cáo hàng sắp hết ====
 elif menu=="Báo cáo hàng sắp hết":
-    st.header("Hàng tồn sắp hết / tồn lâu")
-    days_limit = st.number_input("Số ngày tồn tối đa", value=180)
-    qty_limit = st.number_input("Số lượng tối thiểu", value=3)
-    date_limit = (datetime.now()-timedelta(days=days_limit)).strftime("%Y-%m-%d")
-    cursor.execute("SELECT * FROM products WHERE quantity<? OR created_at<?",(qty_limit,date_limit))
-    rows = cursor.fetchall()
-    df_low = pd.DataFrame(rows, columns=["ID","SKU","Tên sản phẩm","Số lượng","Ngày tạo"])
+    st.header("Hàng tồn sắp hết")
+    df_stock = refresh_stock()
+    df_low = df_stock[df_stock["Số lượng"]<5]
     st.dataframe(df_low.style.apply(highlight_low, axis=None))
 
 # ==== Lịch sử giao dịch ====
@@ -169,8 +211,8 @@ elif menu=="Lịch sử giao dịch":
 # ==== Xuất Excel ====
 elif menu=="Xuất Excel":
     st.header("Xuất Excel")
-    df = refresh_products()
-    file_name = f"Kho{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    df.to_excel(file_name,index=False)
+    df_stock = refresh_stock()
+    file_name = f"Inventory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    df_stock.to_excel(file_name,index=False)
     st.success(f"Đã xuất Excel: {file_name}")
     st.download_button("Tải file Excel", data=open(file_name,"rb"), file_name=file_name)
