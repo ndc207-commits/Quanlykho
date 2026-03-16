@@ -144,14 +144,39 @@ elif menu=="Cập nhật/Xóa sản phẩm":
     else:
         product = st.selectbox("Chọn sản phẩm", df["Tên sản phẩm"])
         pid = df[df["Tên sản phẩm"]==product]["ID"].values[0]
+
         new_name = st.text_input("Tên mới", value=product)
         new_sku = st.text_input("SKU mới", value=df[df["Tên sản phẩm"]==product]["SKU"].values[0])
+
+        # Lấy danh sách kho
+        cursor.execute("SELECT name FROM warehouses")
+        warehouses_list = [row[0] for row in cursor.fetchall()]
+
+        # Nhập số lượng từng kho
+        qty_dict = {}
+        st.subheader("Số lượng từng kho")
+        for wh in warehouses_list:
+            cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?",(pid,wh))
+            res = cursor.fetchone()
+            current_qty = res[0] if res else 0
+            qty_dict[wh] = st.number_input(f"{wh}", min_value=0, value=current_qty, step=1, key=f"update_qty_{wh}")
+
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Cập nhật"):
+                # Cập nhật tên và SKU
                 cursor.execute("UPDATE products SET name=?, sku=? WHERE id=?",(new_name,new_sku,pid))
+                # Cập nhật số lượng từng kho
+                for wh, qty in qty_dict.items():
+                    cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?",(pid,wh))
+                    res = cursor.fetchone()
+                    if res:
+                        cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?",(qty,pid,wh))
+                    else:
+                        cursor.execute("INSERT INTO stock_by_warehouse(product_id,warehouse,quantity) VALUES (?,?,?)",(pid,wh,qty))
                 conn.commit()
                 st.success(f"Cập nhật sản phẩm {product} thành công!")
+
         with col2:
             if st.button("Xóa sản phẩm"):
                 cursor.execute("DELETE FROM products WHERE id=?",(pid,))
