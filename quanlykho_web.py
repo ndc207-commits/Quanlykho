@@ -1,11 +1,11 @@
-# inventory_web_full_pro5_2.py
+# inventory_web_full_pro5_3.py
 import streamlit as st
 import sqlite3
 from datetime import datetime, timedelta
 import pandas as pd
 
 # ==== Kết nối Database ====
-conn = sqlite3.connect("inventory_web_full_pro5_2.db", check_same_thread=False)
+conn = sqlite3.connect("inventory_web_full_pro5_3.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ==== Tạo bảng nếu chưa có ====
@@ -65,7 +65,7 @@ if cursor.fetchone()[0]==0:
     conn.commit()
 
 # ==== Sidebar menu ====
-st.sidebar.title("QUẢN LÝ KHO AMME THE")
+st.sidebar.title("Inventory Web Full Pro 5.3")
 menu = st.sidebar.radio("Điều hướng", ["Kho hàng","Thêm sản phẩm","Cập nhật/Xóa sản phẩm","Nhập/Xuất","Báo cáo hàng sắp hết","Lịch sử giao dịch","Xuất Excel"])
 
 # ==== Hàm tiện ích ====
@@ -93,9 +93,7 @@ def highlight_low(x):
 if menu=="Kho hàng":
     st.header("Tồn kho theo từng kho")
     df_stock = refresh_stock()
-    st.dataframe(
-    df_stock.style.applymap(lambda x: 'background-color: #FFAAAA' if x<5 else '', subset=["Số lượng"])
-)
+    st.dataframe(df_stock.style.apply(highlight_low, axis=None))
 
 # ==== Thêm sản phẩm ====
 elif menu=="Thêm sản phẩm":
@@ -181,7 +179,8 @@ elif menu=="Nhập/Xuất":
             st.subheader("Nhập số lượng muốn xuất cho từng kho")
             for wh in fixed_warehouses:
                 cursor.execute("SELECT IFNULL(quantity,0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?",(pid,wh))
-                current_qty = cursor.fetchone()[0]
+                res = cursor.fetchone()
+                current_qty = res[0] if res else 0  # Nếu chưa có record, tồn kho = 0
                 qty_per_warehouse[wh] = st.number_input(f"{wh} (tồn hiện tại {current_qty})", min_value=0, max_value=current_qty, step=1, key=f"qty_{wh}")
         else:
             for wh in fixed_warehouses:
@@ -213,14 +212,7 @@ elif menu=="Nhập/Xuất":
                             cursor.execute("INSERT INTO stock_by_warehouse(product_id,warehouse,quantity) VALUES (?,?,?)",
                                            (pid,wh,qty))
                         else:
-                            st.error(f"Kho {wh} chưa có sản phẩm này!")
-                            st.stop()
-                    cursor.execute(
-                        "INSERT INTO history(product_id,type,quantity,date,employee,warehouse) VALUES (?,?,?,?,?,?)",
-                        (pid,type_tx,qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),emp,wh)
-                    )
-            conn.commit()
-            st.success(f"{type_tx} thành công {sum(qty_per_warehouse.values())} sản phẩm '{product}' cho 4 kho và {len(employees_list)} nhân viên.")
+                            st.error
 
 # ==== Báo cáo hàng sắp hết ====
 elif menu=="Báo cáo hàng sắp hết":
