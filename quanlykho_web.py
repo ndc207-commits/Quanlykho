@@ -59,7 +59,7 @@ if cursor.fetchone()[0]==0:
     conn.commit()
 
 # ==== Sidebar menu ====
-st.sidebar.title("Quan Ly Kho Amme Thé")
+st.sidebar.title("Quản Lý Kho Amme Thé")
 menu = st.sidebar.radio("Điều hướng", ["Kho hàng","Thêm sản phẩm","Cập nhật/Xóa sản phẩm","Nhập/Xuất","Báo cáo hàng sắp hết","Lịch sử giao dịch","Xuất Excel"])
 
 # ==== Hàm tiện ích ====
