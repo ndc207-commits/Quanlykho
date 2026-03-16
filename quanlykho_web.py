@@ -224,11 +224,20 @@ elif menu=="Báo cáo hàng sắp hết":
     days_limit = st.number_input("Số ngày tồn tối đa", value=180)
     qty_limit = st.number_input("Số lượng tối thiểu", value=3)
     date_limit = (datetime.now()-timedelta(days=days_limit)).strftime("%Y-%m-%d")
-    cursor.execute("SELECT * FROM products WHERE quantity<? OR created_at<?",(qty_limit,date_limit))
+
+    # Lấy tổng tồn kho từng sản phẩm
+    cursor.execute("""
+        SELECT p.id, p.sku, p.name, IFNULL(SUM(s.quantity),0) as Tong_ton, p.created_at
+        FROM products p
+        LEFT JOIN stock_by_warehouse s ON p.id=s.product_id
+        GROUP BY p.id
+        HAVING Tong_ton < ? OR p.created_at < ?
+    """, (qty_limit, date_limit))
+
     rows = cursor.fetchall()
     df_low = pd.DataFrame(rows, columns=["ID","SKU","Tên sản phẩm","Số lượng","Ngày tạo"])
 
-    # Áp dụng style để highlight hàng tồn dưới mức thấp
+    # Highlight hàng tồn <5
     st.dataframe(
         df_low.style.applymap(
             lambda x: 'background-color: #FFAAAA' if isinstance(x,int) and x<5 else '',
