@@ -150,8 +150,8 @@ elif menu=="Nhập/Xuất":
 # ==== Báo cáo hàng sắp hết ====
 elif menu=="Báo cáo hàng sắp hết":
     st.header("Hàng tồn sắp hết / tồn lâu")
-    days_limit = st.number_input("Số ngày tồn tối đa", value=60)
-    qty_limit = st.number_input("Số lượng tối thiểu", value=5)
+    days_limit = st.number_input("Số ngày tồn tối đa", value=180)
+    qty_limit = st.number_input("Số lượng tối thiểu", value=3)
     date_limit = (datetime.now()-timedelta(days=days_limit)).strftime("%Y-%m-%d")
     cursor.execute("SELECT * FROM products WHERE quantity<? OR created_at<?",(qty_limit,date_limit))
     rows = cursor.fetchall()
