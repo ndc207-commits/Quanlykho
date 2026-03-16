@@ -170,7 +170,7 @@ elif menu=="Lịch sử giao dịch":
 elif menu=="Xuất Excel":
     st.header("Xuất Excel")
     df = refresh_products()
-    file_name = f"inventory_full_pro5_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    file_name = f"Kho{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     df.to_excel(file_name,index=False)
     st.success(f"Đã xuất Excel: {file_name}")
     st.download_button("Tải file Excel", data=open(file_name,"rb"), file_name=file_name)
