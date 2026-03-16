@@ -150,43 +150,39 @@ elif menu == "Cập nhật/Xóa sản phẩm":
         fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
         qty_per_warehouse = {}
 
-        # Lấy số lượng từ từng kho và điền vào form
         for wh in fixed_warehouses:
             cursor.execute("SELECT IFNULL(quantity, 0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
             res = cursor.fetchone()
             current_qty = res[0] if res else 0
             qty_per_warehouse[wh] = current_qty
 
-        # Hiển thị form nhập liệu cho số lượng từng kho
-        qty_inputs = {}
-        st.subheader("Cập nhật số lượng cho từng kho")
-        for wh in fixed_warehouses:
-            qty_inputs[wh] = st.number_input(
-                f"Số lượng tại {wh} (hiện tại {qty_per_warehouse[wh]})", 
-                min_value=0, 
-                value=qty_per_warehouse[wh], 
-                step=1, 
-                key=f"qty_{wh}"
-            )
+        # Hiển thị thông tin số lượng từng kho
+        st.write(f"Số lượng sản phẩm '{product}' trong các kho hiện tại:")
+        st.write(qty_per_warehouse)
 
         col1, col2 = st.columns(2)
 
         with col1:
             if st.button("Cập nhật"):
+                # Cập nhật số lượng sản phẩm cho các kho
+                qty_inputs = {}
+                for wh in fixed_warehouses:
+                    qty_inputs[wh] = st.number_input(f"Số lượng tại {wh}", min_value=0, value=qty_per_warehouse[wh], step=1, key=f"qty_{wh}")
+
                 for wh in fixed_warehouses:
                     new_qty = qty_inputs[wh]
-                    cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?",
-                                   (new_qty, pid, wh))
+                    cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?", (new_qty, pid, wh))
                 conn.commit()
-                st.success(f"Cập nhật số lượng sản phẩm '{product}' thành công!")
-        
+                st.success(f"Cập nhật sản phẩm '{product}' thành công!")
+
         with col2:
             if st.button("Xóa sản phẩm"):
-                for wh in fixed_warehouses:
-                    cursor.execute("DELETE FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
+                # Xóa sản phẩm khỏi bảng stock_by_warehouse
+                cursor.execute("DELETE FROM stock_by_warehouse WHERE product_id=?", (pid,))
+                # Xóa sản phẩm khỏi bảng products
                 cursor.execute("DELETE FROM products WHERE id=?", (pid,))
                 conn.commit()
-                st.success(f"Đã xóa sản phẩm '{product}' cùng với dữ liệu trong các kho.")
+                st.success(f"Đã xóa sản phẩm '{product}' và tất cả thông tin liên quan trong các kho.")
 
 # ==== Nhập/Xuất kho cho 4 kho cố định ====
 elif menu == "Nhập/Xuất":
