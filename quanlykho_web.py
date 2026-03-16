@@ -205,14 +205,15 @@ elif menu=="Nhập/Xuất":
         fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
         qty_per_warehouse = {}
 
+        # Nhập số lượng kho cho từng kho cố định
         st.subheader("Nhập số lượng từng kho" if type_tx=="Nhập" else "Xuất số lượng từng kho")
         for wh in fixed_warehouses:
             cursor.execute("SELECT IFNULL(quantity,0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?",(pid,wh))
             res = cursor.fetchone()
-            current_qty = res[0] if res else 0
+            current_qty = res[0] if res else 0  # Nếu chưa có record, tồn kho = 0
             max_value = None if type_tx=="Nhập" else current_qty
             qty_per_warehouse[wh] = st.number_input(
-                f"{wh} (hiện tại {current_qty})",
+                f"{wh} (tồn hiện tại {current_qty})",
                 min_value=0,
                 max_value=max_value,
                 step=1,
@@ -220,6 +221,7 @@ elif menu=="Nhập/Xuất":
             )
 
         if st.button("Xác nhận"):
+            # Kiểm tra nếu là giao dịch xuất và tổng số lượng cần xuất lớn hơn tồn kho
             if type_tx=="Xuất":
                 total_needed = sum(qty_per_warehouse.values())
                 cursor.execute("SELECT IFNULL(SUM(quantity),0) FROM stock_by_warehouse WHERE product_id=?",(pid,))
@@ -248,54 +250,13 @@ elif menu=="Nhập/Xuất":
                             st.error(f"Kho {wh} chưa có sản phẩm này!")
                             st.stop()
 
+                    # Ghi lịch sử giao dịch
                     cursor.execute(
                         "INSERT INTO history(product_id,type,quantity,date,employee,warehouse) VALUES (?,?,?,?,?,?)",
                         (pid,type_tx,qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),emp,wh)
                     )
             conn.commit()
             st.success(f"{type_tx} thành công {sum(qty_per_warehouse.values())} sản phẩm '{product}' cho 4 kho và {len(employees_list)} nhân viên.")
-
-        # 4 kho cố định
-        fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
-        qty_per_warehouse = {}
-        if type_tx=="Xuất":
-            st.subheader("Nhập số lượng muốn xuất cho từng kho")
-            for wh in fixed_warehouses:
-                cursor.execute("SELECT IFNULL(quantity,0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?",(pid,wh))
-                res = cursor.fetchone()
-                current_qty = res[0] if res else 0  # Nếu chưa có record, tồn kho = 0
-                qty_per_warehouse[wh] = st.number_input(f"{wh} (tồn hiện tại {current_qty})", min_value=0, max_value=current_qty, step=1, key=f"qty_{wh}")
-        else:
-            for wh in fixed_warehouses:
-                qty_per_warehouse[wh] = qty_total
-
-        if st.button("Xác nhận"):
-            if type_tx=="Xuất":
-                total_needed = sum(qty_per_warehouse.values())
-                cursor.execute("SELECT IFNULL(SUM(quantity),0) FROM stock_by_warehouse WHERE product_id=?",(pid,))
-                total_qty = cursor.fetchone()[0]
-                if total_needed > total_qty:
-                    st.error(f"Tổng cần xuất {total_needed}, nhưng tồn kho hiện tại {total_qty}")
-                    st.stop()
-
-            for emp in employees_list:
-                for wh in fixed_warehouses:
-                    qty = qty_per_warehouse[wh]
-                    if qty==0:
-                        continue
-                    cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?",(pid,wh))
-                    res = cursor.fetchone()
-                    if res:
-                        current_qty = res[0]
-                        new_qty = current_qty + qty if type_tx=="Nhập" else current_qty - qty
-                        cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?",
-                                       (new_qty,pid,wh))
-                    else:
-                        if type_tx=="Nhập":
-                            cursor.execute("INSERT INTO stock_by_warehouse(product_id,warehouse,quantity) VALUES (?,?,?)",
-                                           (pid,wh,qty))
-                        else:
-                            st.error
 
 # ==== Báo cáo hàng sắp hết ====
 elif menu=="Báo cáo hàng sắp hết":
