@@ -65,7 +65,7 @@ if cursor.fetchone()[0]==0:
     conn.commit()
 
 # ==== Sidebar menu ====
-st.sidebar.title("Inventory Web Full Pro 5.3")
+st.sidebar.title("QUẢN LÝ KHO AMME THE")
 menu = st.sidebar.radio("Điều hướng", ["Kho hàng","Thêm sản phẩm","Cập nhật/Xóa sản phẩm","Nhập/Xuất","Báo cáo hàng sắp hết","Lịch sử giao dịch","Xuất Excel"])
 
 # ==== Hàm tiện ích ====
@@ -88,12 +88,16 @@ def refresh_stock():
 
 def highlight_low(x):
     return ['background-color: #FFAAAA' if v<5 else '' for v in x["Số lượng"]]
-
 # ==== Kho hàng ====
 if menu=="Kho hàng":
     st.header("Tồn kho theo từng kho")
     df_stock = refresh_stock()
-    st.dataframe(df_stock.style.apply(highlight_low, axis=None))
+    st.dataframe(
+        df_stock.style.applymap(
+            lambda x: 'background-color: #FFAAAA' if isinstance(x,int) and x<5 else '',
+            subset=["Số lượng"]
+        )
+    )
 
 # ==== Thêm sản phẩm ====
 elif menu=="Thêm sản phẩm":
@@ -216,11 +220,21 @@ elif menu=="Nhập/Xuất":
 
 # ==== Báo cáo hàng sắp hết ====
 elif menu=="Báo cáo hàng sắp hết":
-    st.header("Hàng tồn sắp hết")
-    df_stock = refresh_stock()
-    df_low = df_stock[df_stock["Số lượng"]<5]
-    st.dataframe(df_low.style.apply(highlight_low, axis=None))
+    st.header("Hàng tồn sắp hết / tồn lâu")
+    days_limit = st.number_input("Số ngày tồn tối đa", value=180)
+    qty_limit = st.number_input("Số lượng tối thiểu", value=3)
+    date_limit = (datetime.now()-timedelta(days=days_limit)).strftime("%Y-%m-%d")
+    cursor.execute("SELECT * FROM products WHERE quantity<? OR created_at<?",(qty_limit,date_limit))
+    rows = cursor.fetchall()
+    df_low = pd.DataFrame(rows, columns=["ID","SKU","Tên sản phẩm","Số lượng","Ngày tạo"])
 
+    # Áp dụng style để highlight hàng tồn dưới mức thấp
+    st.dataframe(
+        df_low.style.applymap(
+            lambda x: 'background-color: #FFAAAA' if isinstance(x,int) and x<5 else '',
+            subset=["Số lượng"]
+        )
+    )
 # ==== Lịch sử giao dịch ====
 elif menu=="Lịch sử giao dịch":
     st.header("Lịch sử nhập xuất")
