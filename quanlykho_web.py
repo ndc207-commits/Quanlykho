@@ -1,11 +1,11 @@
-# inventory_web_full_pro5_1.py
+# inventory_web_full_pro5_2.py
 import streamlit as st
 import sqlite3
 from datetime import datetime, timedelta
 import pandas as pd
 
 # ==== Kết nối Database ====
-conn = sqlite3.connect("inventory_web_full_pro5_1.db", check_same_thread=False)
+conn = sqlite3.connect("inventory_web_full_pro5_2.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ==== Tạo bảng nếu chưa có ====
@@ -97,16 +97,35 @@ if menu=="Kho hàng":
 
 # ==== Thêm sản phẩm ====
 elif menu=="Thêm sản phẩm":
-    st.header("Thêm sản phẩm mới")
+    st.header("Thêm sản phẩm mới với số lượng từng kho")
     sku = st.text_input("Mã sản phẩm (SKU)")
     name = st.text_input("Tên sản phẩm")
+
+    # Lấy danh sách kho
+    cursor.execute("SELECT name FROM warehouses")
+    warehouses_list = [row[0] for row in cursor.fetchall()]
+
+    # Nhập số lượng cho từng kho
+    qty_dict = {}
+    for wh in warehouses_list:
+        qty_dict[wh] = st.number_input(f"Số lượng kho {wh}", min_value=0, step=1, key=f"qty_{wh}")
+
     if st.button("Thêm sản phẩm"):
         if sku and name:
             try:
+                # Thêm vào bảng products
                 cursor.execute("INSERT INTO products(sku,name,created_at) VALUES (?,?,?)",
                                (sku,name,datetime.now().strftime("%Y-%m-%d")))
+                pid = cursor.lastrowid
+
+                # Thêm số lượng từng kho
+                for wh, qty in qty_dict.items():
+                    if qty>0:
+                        cursor.execute("INSERT INTO stock_by_warehouse(product_id,warehouse,quantity) VALUES (?,?,?)",
+                                       (pid, wh, qty))
+
                 conn.commit()
-                st.success(f"Thêm sản phẩm {name} thành công!")
+                st.success(f"Thêm sản phẩm '{name}' thành công với số lượng từng kho!")
             except sqlite3.IntegrityError:
                 st.error("SKU đã tồn tại!")
         else:
@@ -185,11 +204,10 @@ elif menu=="Nhập/Xuất":
                             st.error(f"Kho {wh} chưa có sản phẩm này!")
                             st.stop()
                     # Lưu lịch sử
-                    for emp in employees_list:
-                        cursor.execute(
-                            "INSERT INTO history(product_id,type,quantity,date,employee,warehouse) VALUES (?,?,?,?,?,?)",
-                            (pid,type_tx,qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),emp,wh)
-                        )
+                    cursor.execute(
+                        "INSERT INTO history(product_id,type,quantity,date,employee,warehouse) VALUES (?,?,?,?,?,?)",
+                        (pid,type_tx,qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),emp,wh)
+                    )
             conn.commit()
             st.success(f"{type_tx} thành công {qty} sản phẩm '{product}' cho {len(warehouses_list)} kho và {len(employees_list)} nhân viên.")
 
