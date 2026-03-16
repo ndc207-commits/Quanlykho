@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 # ==== Kết nối Database ====
-conn = sqlite3.connect("inventory_web_full_pro5_3.db", check_same_thread=False)
+conn = sqlite3.connect("kho.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ==== Tạo bảng nếu chưa có ====
