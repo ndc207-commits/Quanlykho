@@ -173,11 +173,11 @@ elif menu == "Cập nhật/Xóa sản phẩm":
 # ==== Nhập/Xuất kho cho 4 kho cố định ====
 elif menu == "Nhập/Xuất":
     st.header("Nhập / Xuất kho cho 4 kho cố định")
-    df = refresh_products()
-    
+    df = refresh_products()  # Lấy danh sách sản phẩm
     if df.empty:
         st.warning("Chưa có sản phẩm nào")
     else:
+        # Chọn sản phẩm
         product = st.selectbox("Chọn sản phẩm", df["Tên sản phẩm"])
         pid = df[df["Tên sản phẩm"] == product]["ID"].values[0]
 
@@ -185,14 +185,13 @@ elif menu == "Nhập/Xuất":
         fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
         qty_per_warehouse = {}
 
-        # Lấy số lượng sản phẩm hiện tại trong các kho
+        # Hiển thị số lượng sản phẩm trong từng kho
         for wh in fixed_warehouses:
             cursor.execute("SELECT IFNULL(quantity, 0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
             res = cursor.fetchone()
             current_qty = res[0] if res else 0  # Nếu không có sản phẩm trong kho, số lượng = 0
             qty_per_warehouse[wh] = current_qty
 
-        # Hiển thị số lượng sản phẩm trong các kho
         st.write(f"Số lượng sản phẩm '{product}' trong các kho hiện tại:")
         st.write(qty_per_warehouse)
 
