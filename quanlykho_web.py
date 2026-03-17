@@ -1,13 +1,13 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # ================= DATABASE =================
 conn = sqlite3.connect("inventory.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# ================= TABLES =================
+# ================= CREATE TABLES =================
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS products(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,10 +52,9 @@ if cursor.fetchone()[0] == 0:
     cursor.executemany(
         "INSERT INTO warehouses(name) VALUES (?)",
         [
-            ("Kho La Pagode",),
-            ("Kho Muse",),
-            ("Kho Metz Ville",),
-            ("Kho Nancy",)
+            ("Kho A",),
+            ("Kho B",),
+            ("Kho C",)
         ]
     )
     conn.commit()
@@ -66,13 +65,15 @@ def get_products():
     return pd.DataFrame(cursor.fetchall(), columns=["ID","SKU","Tên sản phẩm","Ngày tạo"])
 
 def get_stock():
+
     cursor.execute("""
-    SELECT p.id,p.sku,p.name,w.name,IFNULL(s.quantity,0)
+    SELECT p.id,p.sku,p.name,w.name,COALESCE(s.quantity,0)
     FROM products p
     CROSS JOIN warehouses w
     LEFT JOIN stock_by_warehouse s
     ON p.id=s.product_id AND s.warehouse=w.name
     """)
+
     return pd.DataFrame(
         cursor.fetchall(),
         columns=["ID","SKU","Tên sản phẩm","Kho","Số lượng"]
@@ -91,8 +92,8 @@ menu = st.sidebar.radio(
         "Kho hàng",
         "Thêm sản phẩm",
         "Nhập/Xuất",
-        "Báo cáo hàng sắp hết",
-        "Lịch sử giao dịch"
+        "Lịch sử giao dịch",
+        "Xuất Excel"
     ]
 )
 
@@ -103,22 +104,16 @@ if menu == "Kho hàng":
 
     df = get_stock()
 
-    search = st.text_input("🔎 Tìm sản phẩm theo SKU hoặc tên")
+    search = st.text_input("🔎 Tìm theo SKU hoặc tên")
 
     if search:
+
         df = df[
             df["SKU"].str.contains(search,case=False) |
             df["Tên sản phẩm"].str.contains(search,case=False)
         ]
 
-    st.dataframe(
-        df.style.applymap(
-            lambda x:'background-color:#ffcccc'
-            if isinstance(x,int) and x<5 else '',
-            subset=["Số lượng"]
-        ),
-        use_container_width=True
-    )
+    st.dataframe(df,use_container_width=True)
 
 # ================= ADD PRODUCT =================
 elif menu == "Thêm sản phẩm":
@@ -135,7 +130,7 @@ elif menu == "Thêm sản phẩm":
     for w in warehouses:
         qty[w] = st.number_input(f"Số lượng {w}",min_value=0)
 
-    if st.button("Thêm"):
+    if st.button("Thêm sản phẩm"):
 
         try:
 
@@ -147,19 +142,20 @@ elif menu == "Thêm sản phẩm":
             pid = cursor.lastrowid
 
             for w,q in qty.items():
-                if q>0:
-                    cursor.execute(
-                        "INSERT INTO stock_by_warehouse(product_id,warehouse,quantity) VALUES (?,?,?)",
-                        (pid,w,q)
-                    )
+
+                cursor.execute(
+                    "INSERT INTO stock_by_warehouse(product_id,warehouse,quantity) VALUES (?,?,?)",
+                    (pid,w,q)
+                )
 
             conn.commit()
 
-            st.success("Thêm sản phẩm thành công")
+            st.success("Đã thêm sản phẩm")
 
             st.rerun()
 
         except:
+
             st.error("SKU đã tồn tại")
 
 # ================= IMPORT EXPORT =================
@@ -182,7 +178,7 @@ elif menu == "Nhập/Xuất":
 
     type_tx = st.radio("Loại giao dịch",["Nhập","Xuất"])
 
-    if st.button("Xác nhận"):
+    if st.button("Xác nhận giao dịch"):
 
         for w,q in qty.items():
 
@@ -195,10 +191,10 @@ elif menu == "Nhập/Xuất":
 
             current = res[0] if res else 0
 
-            if type_tx=="Nhập":
+            if type_tx == "Nhập":
                 new = current + q
             else:
-                if q>current:
+                if q > current:
                     st.error(f"{w} không đủ hàng")
                     st.stop()
                 new = current - q
@@ -235,19 +231,6 @@ elif menu == "Nhập/Xuất":
 
         st.rerun()
 
-# ================= LOW STOCK =================
-elif menu == "Báo cáo hàng sắp hết":
-
-    st.header("⚠️ Hàng sắp hết")
-
-    limit = st.number_input("Ngưỡng cảnh báo",value=5)
-
-    df = get_stock()
-
-    df = df[df["Số lượng"]<limit]
-
-    st.dataframe(df)
-
 # ================= HISTORY =================
 elif menu == "Lịch sử giao dịch":
 
@@ -273,3 +256,21 @@ elif menu == "Lịch sử giao dịch":
     )
 
     st.dataframe(df)
+
+# ================= EXPORT EXCEL =================
+elif menu == "Xuất Excel":
+
+    st.header("📄 Xuất Excel tồn kho")
+
+    df = get_stock()
+
+    file = "ton_kho.xlsx"
+
+    df.to_excel(file,index=False)
+
+    with open(file,"rb") as f:
+        st.download_button(
+            "⬇️ Tải file Excel",
+            f,
+            file_name="ton_kho.xlsx"
+        )
