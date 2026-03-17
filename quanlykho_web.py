@@ -1,10 +1,10 @@
 import streamlit as st
 import sqlite3
+from datetime import datetime
 import pandas as pd
-from datetime import datetime, timedelta
 
 # ===== DB =====
-conn = sqlite3.connect("inventory_pro.db", check_same_thread=False)
+conn = sqlite3.connect("inventory_full.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ===== TABLE =====
@@ -33,7 +33,8 @@ sku TEXT,
 type TEXT,
 quantity INTEGER,
 date TEXT,
-warehouse TEXT
+warehouse TEXT,
+note TEXT
 )
 """)
 
@@ -46,12 +47,17 @@ name TEXT
 
 conn.commit()
 
-# ===== DEFAULT DATA =====
+# ===== KHO CỦA BẠN =====
 cursor.execute("SELECT COUNT(*) FROM warehouses")
 if cursor.fetchone()[0] == 0:
     cursor.executemany(
         "INSERT INTO warehouses(name) VALUES (?)",
-        [("Kho A",), ("Kho B",), ("Kho C",)]
+        [
+            ("Kho La Pagode",),
+            ("Kho Muse",),
+            ("Kho Metz Ville",),
+            ("Kho Nancy",)
+        ]
     )
     conn.commit()
 
@@ -72,36 +78,22 @@ def get_warehouses():
     return [x[0] for x in cursor.execute("SELECT name FROM warehouses").fetchall()]
 
 # ===== UI =====
-st.sidebar.title("🚀 INVENTORY PRO")
+st.sidebar.title("📦 QUẢN LÝ KHO PRO")
 
-menu = st.sidebar.radio("Menu",[
-    "Dashboard",
-    "Kho hàng",
+menu = st.sidebar.radio("Chức năng",[
+    "Tồn kho",
     "Thêm sản phẩm",
-    "Nhập/Xuất",
+    "Nhập / Xuất",
+    "Chuyển kho",
+    "Báo cáo",
     "Lịch sử",
     "Xuất Excel"
 ])
 
-# ===== DASHBOARD =====
-if menu == "Dashboard":
+# ===== TỒN KHO =====
+if menu == "Tồn kho":
 
-    st.header("📊 Dashboard")
-
-    df = get_stock()
-
-    total = df["quantity"].sum()
-    low = df[df["quantity"] < 5].shape[0]
-
-    col1,col2 = st.columns(2)
-
-    col1.metric("Tổng tồn kho", total)
-    col2.metric("Sản phẩm sắp hết", low)
-
-# ===== KHO =====
-elif menu == "Kho hàng":
-
-    st.header("📦 Tồn kho")
+    st.header("📦 Tồn kho sản phẩm")
 
     df = get_stock()
 
@@ -113,15 +105,17 @@ elif menu == "Kho hàng":
             df["name"].str.contains(search,case=False)
         ]
 
+    df.columns = ["SKU","Tên sản phẩm","Kho","Số lượng"]
+
     st.dataframe(df,use_container_width=True)
 
-# ===== ADD =====
+# ===== THÊM =====
 elif menu == "Thêm sản phẩm":
 
     st.header("➕ Thêm sản phẩm")
 
     sku = st.text_input("SKU")
-    name = st.text_input("Tên")
+    name = st.text_input("Tên sản phẩm")
 
     if st.button("Thêm"):
         try:
@@ -130,24 +124,30 @@ elif menu == "Thêm sản phẩm":
                 (sku,name,datetime.now())
             )
             conn.commit()
-            st.success("Thêm thành công")
+            st.success("Đã thêm")
             st.rerun()
         except:
-            st.error("SKU tồn tại")
+            st.error("SKU đã tồn tại")
 
-# ===== IMPORT EXPORT =====
-elif menu == "Nhập/Xuất":
+# ===== NHẬP XUẤT =====
+elif menu == "Nhập / Xuất":
 
-    st.header("📥📤 Nhập/Xuất")
+    st.header("📥📤 Nhập / Xuất kho")
 
     df = get_products()
 
-    product = st.selectbox("Chọn", df["name"])
+    if df.empty:
+        st.warning("Chưa có sản phẩm")
+        st.stop()
 
-    sku = df[df["name"]==product]["sku"].values[0]
+    product = st.selectbox(
+        "Chọn sản phẩm",
+        df.apply(lambda x: f"{x['sku']} - {x['name']}", axis=1)
+    )
+
+    sku = product.split(" - ")[0]
 
     warehouses = get_warehouses()
-
     wh = st.selectbox("Kho", warehouses)
 
     qty = st.number_input("Số lượng",min_value=1)
@@ -164,7 +164,7 @@ elif menu == "Nhập/Xuất":
         res = cursor.fetchone()
         current = res[0] if res else 0
 
-        if type_tx=="Nhập":
+        if type_tx == "Nhập":
             new = current + qty
         else:
             if qty > current:
@@ -184,33 +184,128 @@ elif menu == "Nhập/Xuất":
             )
 
         cursor.execute(
-            "INSERT INTO history(sku,type,quantity,date,warehouse) VALUES (?,?,?,?,?)",
-            (sku,type_tx,qty,datetime.now(),wh)
+            "INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
+            (sku,type_tx,qty,datetime.now(),wh,"")
         )
 
         conn.commit()
-        st.success("OK")
+        st.success("Thành công")
         st.rerun()
 
-# ===== HISTORY =====
+# ===== CHUYỂN KHO =====
+elif menu == "Chuyển kho":
+
+    st.header("🔄 Chuyển kho")
+
+    df = get_products()
+
+    if df.empty:
+        st.warning("Chưa có sản phẩm")
+        st.stop()
+
+    product = st.selectbox(
+        "Chọn sản phẩm",
+        df.apply(lambda x: f"{x['sku']} - {x['name']}", axis=1)
+    )
+
+    sku = product.split(" - ")[0]
+
+    warehouses = get_warehouses()
+
+    from_wh = st.selectbox("Từ kho", warehouses)
+    to_wh = st.selectbox("Đến kho", warehouses)
+
+    qty = st.number_input("Số lượng",min_value=1)
+
+    if st.button("Chuyển"):
+
+        if from_wh == to_wh:
+            st.error("Không thể chuyển cùng kho")
+            st.stop()
+
+        # kiểm tra tồn
+        cursor.execute(
+            "SELECT quantity FROM inventory WHERE sku=? AND warehouse=?",
+            (sku,from_wh)
+        )
+
+        res = cursor.fetchone()
+        current = res[0] if res else 0
+
+        if qty > current:
+            st.error("Kho nguồn không đủ hàng")
+            st.stop()
+
+        # trừ kho nguồn
+        cursor.execute(
+            "UPDATE inventory SET quantity=? WHERE sku=? AND warehouse=?",
+            (current-qty,sku,from_wh)
+        )
+
+        # cộng kho đích
+        cursor.execute(
+            "SELECT quantity FROM inventory WHERE sku=? AND warehouse=?",
+            (sku,to_wh)
+        )
+
+        res2 = cursor.fetchone()
+
+        if res2:
+            cursor.execute(
+                "UPDATE inventory SET quantity=? WHERE sku=? AND warehouse=?",
+                (res2[0]+qty,sku,to_wh)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO inventory(sku,warehouse,quantity) VALUES (?,?,?)",
+                (sku,to_wh,qty)
+            )
+
+        # history
+        cursor.execute(
+            "INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
+            (sku,"Chuyển",qty,datetime.now(),from_wh,f"-> {to_wh}")
+        )
+
+        conn.commit()
+
+        st.success("Chuyển kho thành công")
+        st.rerun()
+
+# ===== BÁO CÁO =====
+elif menu == "Báo cáo":
+
+    st.header("⚠️ Hàng sắp hết")
+
+    df = get_stock()
+
+    limit = st.number_input("Ngưỡng cảnh báo",value=5)
+
+    low = df[df["quantity"] < limit]
+
+    low.columns = ["SKU","Tên","Kho","Số lượng"]
+
+    st.dataframe(low)
+
+# ===== LỊCH SỬ =====
 elif menu == "Lịch sử":
 
-    st.header("📜 Lịch sử")
+    st.header("📜 Lịch sử giao dịch")
 
     df = pd.read_sql("SELECT * FROM history ORDER BY date DESC", conn)
 
     st.dataframe(df)
 
-# ===== EXPORT =====
+# ===== EXCEL =====
 elif menu == "Xuất Excel":
 
     st.header("📄 Xuất Excel")
 
     df = get_stock()
 
-    file = "inventory.xlsx"
+    file = "ton_kho.xlsx"
 
     df.to_excel(file,index=False)
 
     with open(file,"rb") as f:
-        st.download_button("Download",f,file_name=file)
+        st.download_button("⬇️ Tải file",f,file_name=file)
