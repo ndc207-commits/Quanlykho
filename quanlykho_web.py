@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 
 # ===== DB =====
-conn = sqlite3.connect("inventory_full.db", check_same_thread=False)
+conn = sqlite3.connect("inventory_final.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ===== TABLE =====
@@ -47,7 +47,7 @@ name TEXT
 
 conn.commit()
 
-# ===== KHO CỦA BẠN =====
+# ===== 4 KHO =====
 cursor.execute("SELECT COUNT(*) FROM warehouses")
 if cursor.fetchone()[0] == 0:
     cursor.executemany(
@@ -78,9 +78,10 @@ def get_warehouses():
     return [x[0] for x in cursor.execute("SELECT name FROM warehouses").fetchall()]
 
 # ===== UI =====
-st.sidebar.title("📦 QUẢN LÝ KHO AMME THE")
+st.sidebar.title("📦 QUẢN LÝ KHO PRO")
 
 menu = st.sidebar.radio("Chức năng",[
+    "Dashboard",
     "Tồn kho",
     "Thêm sản phẩm",
     "Nhập / Xuất",
@@ -90,8 +91,49 @@ menu = st.sidebar.radio("Chức năng",[
     "Xuất Excel"
 ])
 
+# ===== DASHBOARD =====
+if menu == "Dashboard":
+
+    st.header("📊 Dashboard tổng hợp")
+
+    df_stock = get_stock()
+    df_hist = pd.read_sql("SELECT * FROM history", conn)
+
+    if df_stock.empty:
+        st.warning("Chưa có dữ liệu")
+        st.stop()
+
+    # ===== THEO KHO =====
+    st.subheader("📦 Tồn kho theo từng kho")
+
+    kho = df_stock.groupby("warehouse")["quantity"].sum().reset_index()
+    kho.columns = ["Kho", "Tổng số lượng"]
+
+    st.dataframe(kho, use_container_width=True)
+    st.bar_chart(kho.set_index("Kho"))
+
+    # ===== THEO NGÀY =====
+    if not df_hist.empty:
+
+        df_hist["date"] = pd.to_datetime(df_hist["date"])
+
+        df_hist["day"] = df_hist["date"].dt.date
+
+        daily = df_hist.groupby(["day","type"])["quantity"].sum().unstack().fillna(0)
+
+        st.subheader("📅 Nhập / Xuất theo ngày")
+        st.line_chart(daily)
+
+        # ===== THEO THÁNG =====
+        df_hist["month"] = df_hist["date"].dt.to_period("M").astype(str)
+
+        monthly = df_hist.groupby(["month","type"])["quantity"].sum().unstack().fillna(0)
+
+        st.subheader("📆 Nhập / Xuất theo tháng")
+        st.bar_chart(monthly)
+
 # ===== TỒN KHO =====
-if menu == "Tồn kho":
+elif menu == "Tồn kho":
 
     st.header("📦 Tồn kho sản phẩm")
 
@@ -147,11 +189,8 @@ elif menu == "Nhập / Xuất":
 
     sku = product.split(" - ")[0]
 
-    warehouses = get_warehouses()
-    wh = st.selectbox("Kho", warehouses)
-
+    wh = st.selectbox("Kho", get_warehouses())
     qty = st.number_input("Số lượng",min_value=1)
-
     type_tx = st.radio("Loại",["Nhập","Xuất"])
 
     if st.button("Xác nhận"):
@@ -164,7 +203,7 @@ elif menu == "Nhập / Xuất":
         res = cursor.fetchone()
         current = res[0] if res else 0
 
-        if type_tx == "Nhập":
+        if type_tx=="Nhập":
             new = current + qty
         else:
             if qty > current:
@@ -199,10 +238,6 @@ elif menu == "Chuyển kho":
 
     df = get_products()
 
-    if df.empty:
-        st.warning("Chưa có sản phẩm")
-        st.stop()
-
     product = st.selectbox(
         "Chọn sản phẩm",
         df.apply(lambda x: f"{x['sku']} - {x['name']}", axis=1)
@@ -210,20 +245,16 @@ elif menu == "Chuyển kho":
 
     sku = product.split(" - ")[0]
 
-    warehouses = get_warehouses()
-
-    from_wh = st.selectbox("Từ kho", warehouses)
-    to_wh = st.selectbox("Đến kho", warehouses)
-
+    from_wh = st.selectbox("Từ kho", get_warehouses())
+    to_wh = st.selectbox("Đến kho", get_warehouses())
     qty = st.number_input("Số lượng",min_value=1)
 
     if st.button("Chuyển"):
 
         if from_wh == to_wh:
-            st.error("Không thể chuyển cùng kho")
+            st.error("Không thể cùng kho")
             st.stop()
 
-        # kiểm tra tồn
         cursor.execute(
             "SELECT quantity FROM inventory WHERE sku=? AND warehouse=?",
             (sku,from_wh)
@@ -233,16 +264,14 @@ elif menu == "Chuyển kho":
         current = res[0] if res else 0
 
         if qty > current:
-            st.error("Kho nguồn không đủ hàng")
+            st.error("Không đủ hàng")
             st.stop()
 
-        # trừ kho nguồn
         cursor.execute(
             "UPDATE inventory SET quantity=? WHERE sku=? AND warehouse=?",
             (current-qty,sku,from_wh)
         )
 
-        # cộng kho đích
         cursor.execute(
             "SELECT quantity FROM inventory WHERE sku=? AND warehouse=?",
             (sku,to_wh)
@@ -261,15 +290,13 @@ elif menu == "Chuyển kho":
                 (sku,to_wh,qty)
             )
 
-        # history
         cursor.execute(
-            "INSERT INTO history(sku,Ten SP,So Luong,Ngay,Kho,Ghi CHu) VALUES (?,?,?,?,?,?)",
-            (sku,"Chuyển",qty,datetime.now(),from_wh,f"-> {to_wh}")
+            "INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
+            (sku,"Chuyển",qty,datetime.now(),from_wh,f"→ {to_wh}")
         )
 
         conn.commit()
-
-        st.success("Chuyển kho thành công")
+        st.success("Chuyển thành công")
         st.rerun()
 
 # ===== BÁO CÁO =====
@@ -294,7 +321,9 @@ elif menu == "Lịch sử":
 
     df = pd.read_sql("SELECT * FROM history ORDER BY date DESC", conn)
 
-    st.dataframe(df)
+    df.columns = ["ID","SKU","Loại","Số lượng","Thời gian","Kho","Ghi chú"]
+
+    st.dataframe(df, use_container_width=True)
 
 # ===== EXCEL =====
 elif menu == "Xuất Excel":
