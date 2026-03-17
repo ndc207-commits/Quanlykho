@@ -1,4 +1,3 @@
-# inventory_web_full_pro5_3.py
 import streamlit as st
 import sqlite3
 from datetime import datetime, timedelta
@@ -88,6 +87,7 @@ def refresh_stock():
 
 def highlight_low(x):
     return ['background-color: #FFAAAA' if v<5 else '' for v in x["Số lượng"]]
+
 # ==== Kho hàng ====
 if menu=="Kho hàng":
     st.header("Tồn kho theo từng kho")
@@ -130,6 +130,9 @@ elif menu=="Thêm sản phẩm":
 
                 conn.commit()
                 st.success(f"Thêm sản phẩm '{name}' thành công với số lượng từng kho!")
+                # Refresh thông tin kho
+                df_stock = refresh_stock()
+                st.dataframe(df_stock)
             except sqlite3.IntegrityError:
                 st.error("SKU đã tồn tại!")
         else:
@@ -201,6 +204,93 @@ elif menu == "Cập nhật/Xóa sản phẩm":
                 conn.commit()
                 st.success(f"Cập nhật số lượng cho sản phẩm {product} trong từng kho thành công!")
 
+                # Refresh thông tin kho sau khi cập nhật
+                df_stock = refresh_stock()
+                st.dataframe(df_stock)
+
+        with col2:
+            # Xóa sản phẩm theo từng kho
+            if st.button("Xóa sản phẩm trong kho"):
+                for wh in fixed_warehouses:
+                    # Xóa số lượng sản phẩm trong từng kho
+                    cursor.execute("DELETE FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
+                    conn.commit()
+                    st.success(f"Đã xóa sản phẩm '{product}' khỏi kho {wh}.")
+                
+                # Kiểm tra xem sản phẩm có còn tồn tại trong kho nào không
+                cursor.execute("SELECT COUNT(*) FROM
+
+# ==== Cập nhật và Xóa sản phẩm theo kho ====
+elif menu == "Cập nhật/Xóa sản phẩm":
+    st.header("Cập nhật hoặc Xóa sản phẩm theo kho")
+    df = refresh_products()  # Lấy danh sách sản phẩm
+    if df.empty:
+        st.warning("Chưa có sản phẩm nào")
+    else:
+        # Chọn sản phẩm
+        product = st.selectbox("Chọn sản phẩm", df["Tên sản phẩm"])
+        pid = df[df["Tên sản phẩm"] == product]["ID"].values[0]
+        new_name = st.text_input("Tên mới", value=product)
+        new_sku = st.text_input("SKU mới", value=df[df["Tên sản phẩm"] == product]["SKU"].values[0])
+
+        # Kho cố định (4 kho)
+        fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
+        qty_per_warehouse = {}
+
+        # Lấy số lượng sản phẩm trong từng kho
+        for wh in fixed_warehouses:
+            cursor.execute("SELECT IFNULL(quantity, 0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
+            res = cursor.fetchone()
+            current_qty = res[0] if res else 0  # Nếu không có sản phẩm trong kho, số lượng = 0
+            qty_per_warehouse[wh] = current_qty
+        
+        # Hiển thị số lượng trong kho
+        st.write(f"Số lượng sản phẩm '{product}' trong các kho hiện tại:")
+        st.write(qty_per_warehouse)
+
+        # Nhập số lượng cho từng kho
+        qty_inputs = {}
+        st.subheader("Cập nhật số lượng cho từng kho")
+        for wh in fixed_warehouses:
+            qty_inputs[wh] = st.number_input(
+                f"Số lượng tại {wh} (hiện tại {qty_per_warehouse[wh]})", 
+                min_value=0, 
+                value=qty_per_warehouse[wh], 
+                step=1, 
+                key=f"qty_{wh}"
+            )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            # Cập nhật thông tin sản phẩm
+            if st.button("Cập nhật"):
+                # Cập nhật thông tin tên và SKU của sản phẩm
+                cursor.execute("UPDATE products SET name=?, sku=? WHERE id=?", (new_name, new_sku, pid))
+                conn.commit()
+                st.success(f"Cập nhật thông tin sản phẩm {product} thành công!")
+
+                # Cập nhật số lượng cho từng kho
+                for wh in fixed_warehouses:
+                    qty = qty_inputs[wh]
+                    # Kiểm tra xem kho đã có sản phẩm chưa
+                    cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
+                    res = cursor.fetchone()
+                    if res:
+                        current_qty = res[0]
+                        new_qty = qty  # Cập nhật số lượng mới
+                        cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?", 
+                                       (new_qty, pid, wh))
+                    else:
+                        cursor.execute("INSERT INTO stock_by_warehouse(product_id, warehouse, quantity) VALUES (?,?,?)",
+                                       (pid, wh, qty))
+                conn.commit()
+                st.success(f"Cập nhật số lượng cho sản phẩm {product} trong từng kho thành công!")
+                
+                # Làm mới bảng, đặt lại số lượng về 0 nếu không có sản phẩm
+                st.write(f"Thông tin kho sau khi cập nhật:")
+                df_stock = refresh_stock()  # Tải lại thông tin kho
+                st.dataframe(df_stock)
+
         with col2:
             # Xóa sản phẩm theo từng kho
             if st.button("Xóa sản phẩm trong kho"):
@@ -218,93 +308,10 @@ elif menu == "Cập nhật/Xóa sản phẩm":
                     st.success(f"Sản phẩm {product} đã được xóa hoàn toàn khỏi hệ thống!")
                 else:
                     st.warning(f"Sản phẩm {product} vẫn còn tồn tại trong các kho khác, không thể xóa sản phẩm khỏi hệ thống.")
-# ==== Nhập/Xuất kho cho 4 kho cố định ====
-elif menu == "Nhập/Xuất":
-    st.header("Nhập / Xuất kho cho 4 kho cố định")
-    df = refresh_products()  # Lấy danh sách sản phẩm
-    if df.empty:
-        st.warning("Chưa có sản phẩm nào")
-    else:
-        # Chọn sản phẩm
-        product = st.selectbox("Chọn sản phẩm", df["Tên sản phẩm"])
-        pid = df[df["Tên sản phẩm"] == product]["ID"].values[0]
-
-        # Kho cố định (4 kho)
-        fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
-        qty_per_warehouse = {}
-
-        # Hiển thị số lượng sản phẩm trong từng kho
-        for wh in fixed_warehouses:
-            cursor.execute("SELECT IFNULL(quantity, 0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
-            res = cursor.fetchone()
-            current_qty = res[0] if res else 0  # Nếu không có sản phẩm trong kho, số lượng = 0
-            qty_per_warehouse[wh] = current_qty
-
-        st.write(f"Số lượng sản phẩm '{product}' trong các kho hiện tại:")
-        st.write(qty_per_warehouse)
-
-        # Nhập số lượng cho từng kho
-        qty_inputs = {}
-        st.subheader("Nhập / Xuất số lượng cho từng kho")
-        for wh in fixed_warehouses:
-            qty_inputs[wh] = st.number_input(
-                f"Số lượng tại {wh} (hiện tại {qty_per_warehouse[wh]})", 
-                min_value=0, 
-                value=qty_per_warehouse[wh], 
-                step=1, 
-                key=f"qty_{wh}"
-            )
-
-        # Nhập số lượng cho sản phẩm chung
-        total_qty = st.number_input(f"Số lượng {product} muốn nhập/xuất (Tổng số lượng trong tất cả kho)", min_value=0, step=1)
-
-        # Chọn loại giao dịch: Nhập hay Xuất
-        type_tx = st.radio("Loại giao dịch", ["Nhập", "Xuất"])
-
-        # Xử lý Nhập kho
-        if st.button("Xác nhận Nhập kho"):
-            for wh in fixed_warehouses:
-                qty = qty_inputs[wh]
-                # Kiểm tra xem kho đã có sản phẩm chưa
-                cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
-                res = cursor.fetchone()
-                if res:
-                    current_qty = res[0]
-                    new_qty = current_qty + qty  # Thêm số lượng khi nhập
-                    cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?", 
-                                   (new_qty, pid, wh))
-                else:
-                    cursor.execute("INSERT INTO stock_by_warehouse(product_id, warehouse, quantity) VALUES (?,?,?)",
-                                   (pid, wh, qty))
-                conn.commit()
-
-            st.success(f"Nhập kho {sum(qty_inputs.values())} sản phẩm '{product}' thành công!")
-
-        # Xử lý Xuất kho
-        if st.button("Xác nhận Xuất kho"):
-            total_needed = sum(qty_inputs.values())
-            cursor.execute("SELECT IFNULL(SUM(quantity), 0) FROM stock_by_warehouse WHERE product_id=?", (pid,))
-            total_qty = cursor.fetchone()[0]
-
-            if total_needed > total_qty:
-                st.error(f"Tổng cần xuất {total_needed}, nhưng tồn kho hiện tại {total_qty}")
-                st.stop()
-
-            for wh in fixed_warehouses:
-                qty = qty_inputs[wh]
-                cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
-                res = cursor.fetchone()
-                current_qty = res[0] if res else 0
-                if current_qty >= qty:  # Kiểm tra tồn kho
-                    new_qty = current_qty - qty  # Trừ số lượng khi xuất
-                    cursor.execute("UPDATE stock_by_warehouse SET quantity=? WHERE product_id=? AND warehouse=?",
-                                   (new_qty, pid, wh))
-                    conn.commit()
-                else:
-                    st.error(f"Không đủ sản phẩm trong kho {wh} để xuất {qty} sản phẩm.")
-                    st.stop()
-
-            st.success(f"Xuất kho {sum(qty_inputs.values())} sản phẩm '{product}' thành công.")
+                
+                # Làm mới bảng sau khi xóa
+                df_stock = refresh_stock()  # Làm mới bảng tồn kho
+                st.dataframe(df_stock)
 # ==== Báo cáo hàng sắp hết ====
 elif menu=="Báo cáo hàng sắp hết":
     st.header("Hàng tồn sắp hết / tồn lâu")
