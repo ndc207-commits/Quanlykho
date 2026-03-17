@@ -200,14 +200,18 @@ elif menu == "Nhập/Xuất":
         fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
         qty_per_warehouse = {}
 
-        # Hiển thị số lượng sản phẩm hiện tại trong các kho
+        # Lấy số lượng sản phẩm hiện tại trong các kho
         for wh in fixed_warehouses:
             cursor.execute("SELECT IFNULL(quantity, 0) FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
             res = cursor.fetchone()
-            current_qty = res[0] if res else 0
+            current_qty = res[0] if res else 0  # Nếu không có sản phẩm trong kho, số lượng = 0
             qty_per_warehouse[wh] = current_qty
 
-        # Form nhập số lượng cho từng kho
+        # Hiển thị số lượng sản phẩm trong các kho
+        st.write(f"Số lượng sản phẩm '{product}' trong các kho hiện tại:")
+        st.write(qty_per_warehouse)
+
+        # Nhập số lượng cho từng kho
         qty_inputs = {}
         st.subheader("Nhập / Xuất số lượng cho từng kho")
         for wh in fixed_warehouses:
@@ -219,14 +223,16 @@ elif menu == "Nhập/Xuất":
                 key=f"qty_{wh}"
             )
 
+        # Nhập số lượng cho sản phẩm chung
+        total_qty = st.number_input(f"Số lượng {product} muốn nhập/xuất (Tổng số lượng trong tất cả kho)", min_value=0, step=1)
+
         # Chọn loại giao dịch: Nhập hay Xuất
         type_tx = st.radio("Loại giao dịch", ["Nhập", "Xuất"])
 
-        # Nhập kho
         if st.button("Xác nhận Nhập kho"):
             for wh in fixed_warehouses:
                 qty = qty_inputs[wh]
-                # Cập nhật số lượng khi nhập vào kho
+                # Kiểm tra xem kho đã có sản phẩm chưa
                 cursor.execute("SELECT quantity FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
                 res = cursor.fetchone()
                 if res:
@@ -241,7 +247,6 @@ elif menu == "Nhập/Xuất":
 
             st.success(f"Nhập kho {sum(qty_inputs.values())} sản phẩm '{product}' thành công!")
 
-        # Xuất kho
         if st.button("Xác nhận Xuất kho"):
             total_needed = sum(qty_inputs.values())
             cursor.execute("SELECT IFNULL(SUM(quantity), 0) FROM stock_by_warehouse WHERE product_id=?", (pid,))
@@ -266,7 +271,6 @@ elif menu == "Nhập/Xuất":
                     st.stop()
 
             st.success(f"Xuất kho {sum(qty_inputs.values())} sản phẩm '{product}' thành công.")
-
 # ==== Báo cáo hàng sắp hết ====
 elif menu=="Báo cáo hàng sắp hết":
     st.header("Hàng tồn sắp hết / tồn lâu")
