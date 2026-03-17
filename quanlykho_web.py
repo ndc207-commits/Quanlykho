@@ -263,7 +263,7 @@ elif menu == "Chuyển kho":
 
         # history
         cursor.execute(
-            "INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO history(sku,Ten SP,So Luong,Ngay,Kho,Ghi CHu) VALUES (?,?,?,?,?,?)",
             (sku,"Chuyển",qty,datetime.now(),from_wh,f"-> {to_wh}")
         )
 
