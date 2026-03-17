@@ -10,62 +10,72 @@ cursor = conn.cursor()
 # ==== Tạo bảng nếu chưa có ====
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS products(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-sku TEXT UNIQUE,
-name TEXT,
-quantity INTEGER,
-created_at TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT UNIQUE,
+    name TEXT,
+    quantity INTEGER,
+    created_at TEXT
 )
 """)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS history(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-product_id INTEGER,
-type TEXT,
-quantity INTEGER,
-date TEXT,
-employee TEXT,
-warehouse TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER,
+    type TEXT,
+    quantity INTEGER,
+    date TEXT,
+    employee TEXT,
+    warehouse TEXT
 )
 """)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS employees(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-name TEXT,
-role TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    role TEXT
 )
 """)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS warehouses(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-name TEXT,
-location TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    location TEXT
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS inventory(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT,
+    quantity INTEGER,
+    warehouse TEXT,
+    FOREIGN KEY (sku) REFERENCES products(sku),
+    FOREIGN KEY (warehouse) REFERENCES warehouses(name)
 )
 """)
 conn.commit()
 
 # ==== Thêm dữ liệu mẫu ====
 cursor.execute("SELECT COUNT(*) FROM employees")
-if cursor.fetchone()[0]==0:
-    employees = [("Admin","Manager"), ("Hanh","Staff"), ("Linh","Staff")]
+if cursor.fetchone()[0] == 0:
+    employees = [("Admin", "Manager"), ("Hanh", "Staff"), ("Linh", "Staff")]
     cursor.executemany("INSERT INTO employees(name, role) VALUES (?,?)", employees)
     conn.commit()
 
 cursor.execute("SELECT COUNT(*) FROM warehouses")
-if cursor.fetchone()[0]==0:
-    warehouses = [("Kho La Pagode","Metz"), ("Kho Muse","Muse"), ("Kho Metz Ville","Metz Ville"), ("Kho Nancy","Nancy")]
-    cursor.executemany("INSERT INTO warehouses(name, location) VALUES (?,?)", warehouses)
+if cursor.fetchone()[0] == 0:
+    warehouses = [("Kho La Pagode", "Metz"), ("Kho Muse", "Muse"), ("Kho Metz Ville", "Metz Ville"), ("Kho Nancy", "Nancy")]
+    cursor.executemany("INSERT INTO warehouses(name, location) VALUES (?, ?)", warehouses)
     conn.commit()
 
 # ==== Sidebar menu ====
 st.sidebar.title("Inventory Web Full Pro 5.0")
-menu = st.sidebar.radio("Điều hướng", ["Kho hàng","Thêm sản phẩm","Cập nhật/Xóa sản phẩm","Nhập/Xuất","Báo cáo hàng sắp hết","Lịch sử giao dịch","Xuất Excel"])
+menu = st.sidebar.radio("Điều hướng", ["Kho hàng", "Thêm sản phẩm", "Cập nhật/Xóa sản phẩm", "Nhập/Xuất", "Báo cáo hàng sắp hết", "Lịch sử giao dịch", "Xuất Excel"])
 
 # ==== Hàm tiện ích ====
 def refresh_products():
     cursor.execute("SELECT * FROM products")
     rows = cursor.fetchall()
-    df = pd.DataFrame(rows, columns=["ID","SKU","Tên sản phẩm","Số lượng","Ngày tạo"])
+    df = pd.DataFrame(rows, columns=["ID", "SKU", "Tên sản phẩm", "Số lượng", "Ngày tạo"])
     return df
 
 def get_inventory_per_warehouse():
@@ -82,7 +92,7 @@ def get_inventory_per_warehouse():
 def highlight_low(x):
     return ['background-color: #FFAAAA' if v < 5 else '' for v in x["Số lượng"]]
 
-# ==== Kho hàng ==== 
+# ==== Kho hàng ====
 if menu == "Kho hàng":
     st.header("Danh sách sản phẩm")
     df = get_inventory_per_warehouse()
@@ -170,14 +180,14 @@ elif menu == "Nhập/Xuất":
                 for wh in warehouses_list:
                     # Kiểm tra giao dịch nhập hoặc xuất
                     if type_tx == "Nhập":
-                        cursor.execute("UPDATE products SET quantity=quantity+? WHERE id=?", (qty, pid))
+                        cursor.execute("UPDATE inventory SET quantity=quantity+? WHERE sku=? AND warehouse=?", (qty, product, wh))
                     else:
                         # Kiểm tra số lượng trong kho trước khi xuất
-                        current_quantity = cursor.execute("SELECT quantity FROM products WHERE id=?", (pid,)).fetchone()[0]
-                        if current_quantity < qty:
-                            st.error("Không đủ hàng để xuất!")
+                        current_quantity = cursor.execute("SELECT quantity FROM inventory WHERE sku=? AND warehouse=?", (product, wh)).fetchone()
+                        if current_quantity is None or current_quantity[0] < qty:
+                            st.error(f"Không đủ hàng để xuất từ {wh}!")
                             st.stop()
-                        cursor.execute("UPDATE products SET quantity=quantity-? WHERE id=?", (qty, pid))
+                        cursor.execute("UPDATE inventory SET quantity=quantity-? WHERE sku=? AND warehouse=?", (qty, product, wh))
                     
                     # Ghi lại lịch sử giao dịch
                     cursor.execute("INSERT INTO history(product_id, type, quantity, date, employee, warehouse) VALUES (?,?,?,?,?,?)",
@@ -194,16 +204,7 @@ elif menu == "Báo cáo hàng sắp hết":
     cursor.execute("SELECT * FROM products WHERE quantity<? OR created_at<?", (qty_limit, date_limit))
     rows = cursor.fetchall()
     df_low = pd.DataFrame(rows, columns=["ID", "SKU", "Tên sản phẩm", "Số lượng", "Ngày tạo"])
-    st.dataframe(df_low.style.apply(highlight_low, axis=None))
-
-# ==== Lịch sử giao dịch ====
-elif menu == "Lịch sử giao dịch":
-    st.header("Lịch sử nhập xuất")
-    cursor.execute("SELECT * FROM history")
-    rows = cursor.fetchall()
-    df_hist = pd.DataFrame(rows, columns=["ID", "ProductID", "Loại", "Số lượng", "Ngày giờ", "Nhân viên", "Kho"])
-    st.dataframe(df_hist)
-
+    st
 # ==== Xuất Excel ====
 elif menu == "Xuất Excel":
     st.header("Xuất Excel tồn kho")
