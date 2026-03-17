@@ -115,7 +115,7 @@ elif menu == "Nhập/Xuất":
                     st.stop()
                 new = current - q
 
-            # Cập nhật hoặc chèn dữ liệu tồn kho
+            # Cập nhật hoặc chèn dữ liệu tồn kho bằng INSERT OR REPLACE
             cursor.execute(
                 "INSERT OR REPLACE INTO inventory(sku, product_name, warehouse, quantity, transaction_type, transaction_date) VALUES (?,?,?,?,?,?)",
                 (df[df["Tên sản phẩm"] == product]["SKU"].values[0], product, w, new, type_tx, datetime.now())
