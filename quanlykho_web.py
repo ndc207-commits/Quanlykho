@@ -229,6 +229,7 @@ elif menu == "Nhập/Xuất":
         # Chọn loại giao dịch: Nhập hay Xuất
         type_tx = st.radio("Loại giao dịch", ["Nhập", "Xuất"])
 
+        # Xử lý Nhập kho
         if st.button("Xác nhận Nhập kho"):
             for wh in fixed_warehouses:
                 qty = qty_inputs[wh]
@@ -247,6 +248,7 @@ elif menu == "Nhập/Xuất":
 
             st.success(f"Nhập kho {sum(qty_inputs.values())} sản phẩm '{product}' thành công!")
 
+        # Xử lý Xuất kho
         if st.button("Xác nhận Xuất kho"):
             total_needed = sum(qty_inputs.values())
             cursor.execute("SELECT IFNULL(SUM(quantity), 0) FROM stock_by_warehouse WHERE product_id=?", (pid,))
