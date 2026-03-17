@@ -156,14 +156,20 @@ elif menu == "Cập nhật/Xóa sản phẩm":
 
         with col2:
             if st.button("Xóa sản phẩm"):
-                # Xóa sản phẩm trong bảng stock_by_warehouse trước khi xóa sản phẩm trong bảng products
-                cursor.execute("DELETE FROM stock_by_warehouse WHERE product_id=?", (pid,))
-                conn.commit()
-                
-                # Xóa sản phẩm trong bảng products
-                cursor.execute("DELETE FROM products WHERE id=?", (pid,))
-                conn.commit()
-                st.success(f"Đã xóa sản phẩm {product} khỏi kho và danh sách sản phẩm!")
+                # Xóa số lượng sản phẩm trong tất cả các kho
+                fixed_warehouses = ["Kho La Pagode", "Kho Muse", "Kho Metz Ville", "Kho Nancy"]
+                for wh in fixed_warehouses:
+                    cursor.execute("DELETE FROM stock_by_warehouse WHERE product_id=? AND warehouse=?", (pid, wh))
+                    conn.commit()
+
+                # Kiểm tra nếu sản phẩm không còn tồn tại trong bất kỳ kho nào, xóa sản phẩm khỏi bảng `products`
+                cursor.execute("SELECT COUNT(*) FROM stock_by_warehouse WHERE product_id=?", (pid,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("DELETE FROM products WHERE id=?", (pid,))
+                    conn.commit()
+                    st.success(f"Đã xóa sản phẩm {product} khỏi tất cả các kho và danh sách sản phẩm!")
+                else:
+                    st.warning(f"Sản phẩm {product} vẫn còn tồn tại trong kho, không thể xóa sản phẩm.")
 # ==== Nhập/Xuất kho cho 4 kho cố định ====
 elif menu == "Nhập/Xuất":
     st.header("Nhập / Xuất kho cho 4 kho cố định")
