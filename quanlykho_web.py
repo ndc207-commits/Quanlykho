@@ -78,7 +78,7 @@ def get_warehouses():
     return [x[0] for x in cursor.execute("SELECT name FROM warehouses").fetchall()]
 
 # ===== UI =====
-st.sidebar.title("📦 QUẢN LÝ KHO PRO")
+st.sidebar.title("📦 QUẢN LÝ KHO AMME THE")
 
 menu = st.sidebar.radio("Chức năng",[
     "Tồn kho",
