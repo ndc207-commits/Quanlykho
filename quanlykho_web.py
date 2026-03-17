@@ -16,10 +16,10 @@ CREATE TABLE IF NOT EXISTS inventory(
     warehouse TEXT,
     quantity INTEGER,
     transaction_type TEXT,
-    transaction_date TEXT
+    transaction_date TEXT,
+    UNIQUE(sku, warehouse)  -- Đảm bảo sku và warehouse là duy nhất trong bảng
 )
 """)
-
 conn.commit()
 
 # ================= FUNCTIONS =================
@@ -74,15 +74,20 @@ elif menu == "Thêm sản phẩm":
 
     if st.button("Thêm sản phẩm"):
         try:
-            # Thêm sản phẩm vào bảng inventory
-            for w in warehouses:
-                cursor.execute(
-                    "INSERT INTO inventory(sku, product_name, warehouse, quantity, transaction_type, transaction_date) VALUES (?,?,?,?,?,?)",
-                    (sku, name, w, qty[w], "Thêm", datetime.now())
-                )
-            conn.commit()
-            st.success("Đã thêm sản phẩm")
-            st.rerun()
+            # Kiểm tra xem SKU đã tồn tại chưa
+            cursor.execute("SELECT sku FROM inventory WHERE sku = ?", (sku,))
+            if cursor.fetchone():
+                st.error("SKU này đã tồn tại. Vui lòng nhập SKU khác.")
+            else:
+                # Thêm sản phẩm vào bảng inventory
+                for w in warehouses:
+                    cursor.execute(
+                        "INSERT INTO inventory(sku, product_name, warehouse, quantity, transaction_type, transaction_date) VALUES (?,?,?,?,?,?)",
+                        (sku, name, w, qty[w], "Thêm", datetime.now())
+                    )
+                conn.commit()
+                st.success("Đã thêm sản phẩm")
+                st.rerun()
         except Exception as e:
             st.error(f"Đã xảy ra lỗi: {e}")
 
@@ -100,6 +105,7 @@ elif menu == "Nhập/Xuất":
 
     if st.button("Xác nhận giao dịch"):
         for w, q in qty.items():
+            # Kiểm tra thông tin tồn kho hiện tại
             cursor.execute(
                 "SELECT quantity FROM inventory WHERE sku=? AND warehouse=?",
                 (df[df["Tên sản phẩm"] == product]["SKU"].values[0], w)
@@ -115,7 +121,7 @@ elif menu == "Nhập/Xuất":
                     st.stop()
                 new = current - q
 
-            # Cập nhật hoặc chèn dữ liệu tồn kho bằng INSERT OR REPLACE
+            # Cập nhật hoặc thêm mới vào bảng inventory
             cursor.execute(
                 "INSERT OR REPLACE INTO inventory(sku, product_name, warehouse, quantity, transaction_type, transaction_date) VALUES (?,?,?,?,?,?)",
                 (df[df["Tên sản phẩm"] == product]["SKU"].values[0], product, w, new, type_tx, datetime.now())
