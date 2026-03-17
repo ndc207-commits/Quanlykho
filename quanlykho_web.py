@@ -297,5 +297,7 @@ elif menu == "Xuất Excel":
     # Tạo nút tải file
     with open(file, "rb") as f:
         st.download_button(
-            "⬇️ Tải file
+            "⬇️ Tải file Excel",  # Đảm bảo chuỗi này được đóng đúng cách
+            f,
+            file_name="ton_kho.xlsx"
         )
