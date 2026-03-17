@@ -81,9 +81,9 @@ def safe_get_sku(df, display):
     return row.iloc[0]["sku"]
 
 # ================= UI =================
-st.sidebar.title("📦 QUẢN LÝ KHO PRODUCTION")
+st.sidebar.title("📦 QUẢN LÝ KHO AMME THE")
 
-menu = st.sidebar.radio("Menu",[
+menu = st.sidebar.radio("DANH MUC",[
     "Dashboard",
     "Tồn kho",
     "Thêm sản phẩm",
