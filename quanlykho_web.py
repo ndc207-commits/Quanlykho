@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 # ================= DATABASE =================
-conn = sqlite3.connect("k.db", check_same_thread=False)
+conn = sqlite3.connect("kho.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ================= CREATE TABLES =================
