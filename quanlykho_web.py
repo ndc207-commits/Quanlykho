@@ -193,21 +193,27 @@ elif menu == "Thêm sản phẩm":
 # ================= SUA / XOA =================
 elif menu == "Sửa / Xóa sản phẩm":
 
-    st.header("✏️ Sửa / 🗑️ Xóa sản phẩm")
+    df_products = get_products()   # 👈 đổi tên biến (quan trọng)
 
-    df = get_products()
-
-    if df.empty:
+    if df_products.empty:
         st.warning("Chưa có sản phẩm")
         st.stop()
 
-    df["display"] = df["sku"] + " - " + df["name"]
+    # kiểm tra cột
+    if "sku" not in df_products.columns or "name" not in df_products.columns:
+        st.error("Lỗi dữ liệu: thiếu cột sku hoặc name")
+        st.write(df_products.columns)
+        st.stop()
 
-    selected = st.selectbox("Chọn sản phẩm", df["display"])
-    sku = safe_get_sku(df, selected)
+    df_products["display"] = df_products["sku"] + " - " + df_products["name"]
 
-    product = df[df["sku"] == sku].iloc[0]
+    selected = st.selectbox("Chọn sản phẩm", df_products["display"])
 
+    sku = safe_get_sku(df_products, selected)
+
+    if not sku:
+        st.error("Không lấy được SKU")
+        st.stop()
     # ===== SUA =====
     st.subheader("✏️ Sửa thông tin")
 
