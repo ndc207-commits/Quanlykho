@@ -215,21 +215,52 @@ elif menu == "Sửa / Xóa sản phẩm":
         st.error("Không lấy được SKU")
         st.stop()
     # ===== SUA =====
-    st.subheader("✏️ Sửa thông tin")
+    # ===== CHỌN SẢN PHẨM =====
+df_products = get_products().copy()
 
-    new_name = st.text_input("Tên mới", value=product["name"])
+if df_products.empty:
+    st.warning("Chưa có sản phẩm")
+    st.stop()
 
-    if st.button("Cập nhật"):
-        cursor.execute(
-            "UPDATE products SET name=? WHERE sku=?",
-            (new_name, sku)
-        )
-        conn.commit()
-        st.success("Đã cập nhật")
-        st.rerun()
+if "sku" not in df_products.columns or "name" not in df_products.columns:
+    st.error("Lỗi dữ liệu")
+    st.write(df_products.columns)
+    st.stop()
 
-    st.divider()
+df_products["display"] = df_products["sku"] + " - " + df_products["name"]
 
+selected = st.selectbox("Chọn sản phẩm", df_products["display"])
+
+sku = safe_get_sku(df_products, selected)
+
+if not sku:
+    st.error("Không lấy được SKU")
+    st.stop()
+
+# 👉 lấy product AN TOÀN
+product_df = df_products[df_products["sku"] == sku]
+
+if product_df.empty:
+    st.error("Không tìm thấy sản phẩm")
+    st.stop()
+
+product = product_df.iloc[0]
+
+# ===== SỬA =====
+st.subheader("✏️ Sửa thông tin")
+
+new_name = st.text_input("Tên mới", value=product["name"])
+
+if st.button("Cập nhật"):
+    cursor.execute(
+        "UPDATE products SET name=? WHERE sku=?",
+        (new_name, sku)
+    )
+    conn.commit()
+    st.success("Đã cập nhật")
+    st.rerun()
+
+st.divider()
     # ===== XOA =====
     st.subheader("🗑️ Xóa sản phẩm")
 
