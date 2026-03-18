@@ -451,9 +451,9 @@ elif menu == "Lịch sử":
     df["Thời gian"] = pd.to_datetime(df["Thời gian"])
 
     col1, col2 = st.columns(2)
-    with col1:
-    start_date = st.date_input("Từ ngày", value=None)
-    with col2:
+with col1:
+start_date = st.date_input("Từ ngày", value=None)
+with col2:
     end_date = st.date_input("Đến ngày", value=None)
 
 # 👉 CHỈ lọc khi user thực sự chọn
