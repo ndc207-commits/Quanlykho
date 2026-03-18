@@ -245,26 +245,43 @@ elif menu == "Sửa / Xóa sản phẩm":
         st.success("Đã xóa sản phẩm")
         st.rerun()
 
+# chọn sản phẩm
+df["display"] = df["sku"] + " - " + df["name"]
+selected = st.selectbox("Chọn sản phẩm", df["display"])
+
+sku = safe_get_sku(df, selected)
+
+if sku is None:
+    st.error("Lỗi chọn sản phẩm")
+    st.stop()
+
+product = df[df["sku"] == sku].iloc[0]
+
+# ===== DOI SKU =====
 st.subheader("🔁 Đổi SKU")
 
 new_sku = st.text_input("SKU mới", value=sku)
 
 if st.button("Đổi SKU"):
+
     if not new_sku:
         st.warning("SKU không được trống")
         st.stop()
 
-    try:
-        # update toàn bộ hệ thống
-        cursor.execute("UPDATE products SET sku=? WHERE sku=?", (new_sku, sku))
-        cursor.execute("UPDATE inventory SET sku=? WHERE sku=?", (new_sku, sku))
-        cursor.execute("UPDATE history SET sku=? WHERE sku=?", (new_sku, sku))
+    # check trùng
+    cursor.execute("SELECT 1 FROM products WHERE sku=?", (new_sku,))
+    if cursor.fetchone():
+        st.error("SKU đã tồn tại")
+        st.stop()
 
-        conn.commit()
+    # update
+    cursor.execute("UPDATE products SET sku=? WHERE sku=?", (new_sku, sku))
+    cursor.execute("UPDATE inventory SET sku=? WHERE sku=?", (new_sku, sku))
+    cursor.execute("UPDATE history SET sku=? WHERE sku=?", (new_sku, sku))
 
-        st.success("Đổi SKU thành công")
-        st.rerun()
-
+    conn.commit()
+    st.success("Đổi SKU thành công")
+    st.rerun()
     except:
         st.error("SKU mới đã tồn tại")
 
