@@ -421,80 +421,27 @@ elif menu == "Báo cáo":
 
     st.dataframe(low)
 
+# ================= LỊCH SỬ =================
 elif menu == "Lịch sử":
 
     st.header("📜 Lịch sử")
 
-    # ===== LOAD DATA =====
-    df = pd.read_sql("""
-    SELECT h.id,
-           h.sku,
-           p.name,
-           h.type,
-           h.quantity,
-           h.date,
-           h.warehouse,
-           h.note
-    FROM history h
-    LEFT JOIN products p ON h.sku = p.sku
-    ORDER BY h.date DESC
-    """, conn)
+    df = pd.read_sql("SELECT * FROM history ORDER BY date DESC", conn)
 
-    df.columns = ["ID","SKU","Tên sản phẩm","Loại","Số lượng","Thời gian","Kho","Ghi chú"]
+    df.columns = ["ID","SKU","Loại","Số lượng","Thời gian","Kho","Ghi chú"]
 
-    # ===== FILTER THEO NGÀY =====
-    st.subheader("📅 Lọc theo ngày")
+    st.dataframe(df)
 
-df["Thời gian"] = pd.to_datetime(df["Thời gian"])
+# ================= EXCEL =================
+elif menu == "Xuất Excel":
 
-col1, col2 = st.columns(2)
-with col1:
-    start_date = st.date_input("Từ ngày", value=None)
-with col2:
-    end_date = st.date_input("Đến ngày", value=None)
+    st.header("📄 Xuất Excel")
 
-# 👉 CHỈ lọc khi user thực sự chọn
-if start_date is not None and end_date is not None:
-    df = df[
-        (df["Thời gian"] >= pd.to_datetime(start_date)) &
-        (df["Thời gian"] <= pd.to_datetime(end_date))
-    ]
-    # ===== HIỂN THỊ =====
-    st.subheader("📋 Chi tiết giao dịch")
-    st.dataframe(df, use_container_width=True)
+    df = get_stock()
 
-    # ===== THỐNG KÊ XUẤT =====
-    st.subheader("📊 Tổng xuất theo cửa hàng")
+    file = "ton_kho.xlsx"
+    df.to_excel(file,index=False)
 
-    df_xuat = df[df["Loại"] == "Xuất"]
+    with open(file,"rb") as f:
+        st.download_button("⬇️ Tải file", f, file_name=file)
 
-    if not df_xuat.empty:
-
-        summary = df_xuat.groupby("Ghi chú")["Số lượng"].sum().reset_index()
-        summary.columns = ["Cửa hàng","Tổng xuất"]
-
-        st.dataframe(summary, use_container_width=True)
-        st.bar_chart(summary.set_index("Cửa hàng"))
-
-    else:
-        st.info("Không có dữ liệu xuất")
-
-    # ===== EXPORT EXCEL =====
-    st.subheader("🧾 Xuất Excel")
-
-    if st.button("Xuất file Excel"):
-
-        file_name = "lich_su.xlsx"
-
-        with pd.ExcelWriter(file_name) as writer:
-            df.to_excel(writer, sheet_name="Chi tiết", index=False)
-
-            if not df_xuat.empty:
-                summary.to_excel(writer, sheet_name="Tong_xuat", index=False)
-
-        with open(file_name, "rb") as f:
-            st.download_button(
-                label="⬇️ Tải file Excel",
-                data=f,
-                file_name=file_name
-            )
