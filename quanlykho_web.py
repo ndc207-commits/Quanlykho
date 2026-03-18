@@ -300,32 +300,64 @@ elif menu == "Nhập / Xuất":
 
     wh = st.selectbox("Kho", get_warehouses())
     qty = st.number_input("Số lượng", min_value=1)
-    type_tx = st.radio("Loại", ["Nhập","Xuất"])
+
+    # ✅ CHỌN LOẠI
+    type_tx = st.radio("Loại", ["Nhập", "Xuất"])
+
+    # ✅ CHỌN ĐÍCH XUẤT (chỉ hiện khi Xuất)
+    destination = ""
+    if type_tx == "Xuất":
+        destination = st.selectbox("Xuất đến", ["Muse", "Metz Ville", "Nancy"])
 
     if st.button("Xác nhận"):
 
-        cursor.execute("SELECT quantity FROM inventory WHERE sku=? AND warehouse=?", (sku,wh))
+        cursor.execute(
+            "SELECT quantity FROM inventory WHERE sku=? AND warehouse=?",
+            (sku, wh)
+        )
         res = cursor.fetchone()
         current = res[0] if res else 0
 
-        new = current + qty if type_tx=="Nhập" else current - qty
+        # ===== TÍNH TOÁN =====
+        if type_tx == "Nhập":
+            new = current + qty
+        else:
+            new = current - qty
 
-        if type_tx=="Xuất" and qty > current:
+        # ===== KIỂM TRA =====
+        if type_tx == "Xuất" and qty > current:
             st.error("Không đủ hàng")
             st.stop()
 
+        # ===== UPDATE KHO =====
         if res:
-            cursor.execute("UPDATE inventory SET quantity=? WHERE sku=? AND warehouse=?", (new,sku,wh))
+            cursor.execute(
+                "UPDATE inventory SET quantity=? WHERE sku=? AND warehouse=?",
+                (new, sku, wh)
+            )
         else:
-            cursor.execute("INSERT INTO inventory(sku,warehouse,quantity) VALUES (?,?,?)", (sku,wh,new))
+            cursor.execute(
+                "INSERT INTO inventory(sku,warehouse,quantity) VALUES (?,?,?)",
+                (sku, wh, new)
+            )
 
-        cursor.execute("INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
-                       (sku,type_tx,qty,datetime.now(),wh,""))
+        # ===== GHI LỊCH SỬ =====
+        note = destination if type_tx == "Xuất" else ""
+
+        cursor.execute(
+            "INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
+            (sku, type_tx, qty, datetime.now(), wh, note)
+        )
 
         conn.commit()
-        st.success("Thành công")
-        st.rerun()
 
+        # ===== MESSAGE =====
+        if type_tx == "Xuất":
+            st.success(f"Đã xuất {qty} → {destination}")
+        else:
+            st.success(f"Đã nhập {qty}")
+
+        st.rerun()
 # ================= CHUYỂN KHO =================
 elif menu == "Chuyển kho":
 
