@@ -262,7 +262,7 @@ if st.button("Cập nhật"):
 
 st.divider()
     # ===== XOA =====
-    st.subheader("🗑️ Xóa sản phẩm")
+st.subheader("🗑️ Xóa sản phẩm")
 
     confirm = st.checkbox("Xác nhận xóa sản phẩm này")
 
