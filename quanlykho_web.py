@@ -446,7 +446,7 @@ elif menu == "Lịch sử":
     df.columns = ["ID","SKU","Tên sản phẩm","Loại","Số lượng","Thời gian","Kho","Ghi chú"]
 
     # ===== FILTER THEO NGÀY =====
-st.subheader("📅 Lọc theo ngày")
+    st.subheader("📅 Lọc theo ngày")
 
     # ✅ PHẢI nằm trong block này
     df["Thời gian"] = pd.to_datetime(df["Thời gian"], errors="coerce")
