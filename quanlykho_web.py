@@ -10,6 +10,14 @@ DB_NAME = "inventory_production.db"
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 cursor = conn.cursor()
 
+# ===== MIGRATION: thêm cột is_active nếu chưa có =====
+cursor.execute("PRAGMA table_info(products)")
+columns = [col[1] for col in cursor.fetchall()]
+
+if "is_active" not in columns:
+    cursor.execute("ALTER TABLE products ADD COLUMN is_active INTEGER DEFAULT 1")
+    conn.commit()
+
 # ================= TABLE =================
 cursor.executescript("""
 CREATE TABLE IF NOT EXISTS products(
