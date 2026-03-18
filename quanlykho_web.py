@@ -282,8 +282,7 @@ if st.button("Đổi SKU"):
     conn.commit()
     st.success("Đổi SKU thành công")
     st.rerun()
-    except:
-        st.error("SKU mới đã tồn tại")
+    
 
 # ================= NHẬP XUẤT =================
 elif menu == "Nhập / Xuất":
