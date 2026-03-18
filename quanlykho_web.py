@@ -252,16 +252,32 @@ elif menu == "Sửa / Xóa sản phẩm":
         st.rerun()
 
 # chọn sản phẩm
-df["display"] = df["sku"] + " - " + df["name"]
-selected = st.selectbox("Chọn sản phẩm", df["display"])
+df_products = get_products()   # 👈 luôn lấy mới từ DB
 
-sku = safe_get_sku(df, selected)
+if df_products.empty:
+    st.warning("Chưa có sản phẩm")
+    st.stop()
 
-if sku is None:
+# kiểm tra cột để tránh KeyError
+if "sku" not in df_products.columns or "name" not in df_products.columns:
+    st.error("Lỗi dữ liệu: thiếu cột sku hoặc name")
+    st.write(df_products.columns)
+    st.stop()
+
+# tạo display
+df_products["display"] = df_products["sku"] + " - " + df_products["name"]
+
+# chọn sản phẩm
+selected = st.selectbox("Chọn sản phẩm", df_products["display"])
+
+sku = safe_get_sku(df_products, selected)
+
+if not sku:
     st.error("Lỗi chọn sản phẩm")
     st.stop()
 
-product = df[df["sku"] == sku].iloc[0]
+# lấy product
+product = df_products[df_products["sku"] == sku].iloc[0]
 
 # ===== DOI SKU =====
 st.subheader("🔁 Đổi SKU")
