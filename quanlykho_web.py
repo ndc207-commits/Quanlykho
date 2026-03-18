@@ -446,22 +446,25 @@ elif menu == "Lịch sử":
     df.columns = ["ID","SKU","Tên sản phẩm","Loại","Số lượng","Thời gian","Kho","Ghi chú"]
 
     # ===== FILTER THEO NGÀY =====
-    st.subheader("📅 Lọc theo ngày")
+st.subheader("📅 Lọc theo ngày")
 
-    df["Thời gian"] = pd.to_datetime(df["Thời gian"])
+    # ✅ PHẢI nằm trong block này
+    df["Thời gian"] = pd.to_datetime(df["Thời gian"], errors="coerce")
 
     col1, col2 = st.columns(2)
-with col1:
-start_date = st.date_input("Từ ngày", value=None)
-with col2:
-    end_date = st.date_input("Đến ngày", value=None)
+    with col1:
+        start_date = st.date_input("Từ ngày", value=None)
+    with col2:
+        end_date = st.date_input("Đến ngày", value=None)
 
-# 👉 CHỈ lọc khi user thực sự chọn
-if start_date is not None and end_date is not None:
-    df = df[
-        (df["Thời gian"] >= pd.to_datetime(start_date)) &
-        (df["Thời gian"] <= pd.to_datetime(end_date))
-    ]
+    if start_date is not None and end_date is not None:
+        df = df[
+            (df["Thời gian"] >= pd.to_datetime(start_date)) &
+            (df["Thời gian"] <= pd.to_datetime(end_date))
+        ]
+
+
+
     # ===== HIỂN THỊ =====
     st.subheader("📋 Chi tiết giao dịch")
     st.dataframe(df, use_container_width=True)
