@@ -346,7 +346,7 @@ elif menu == "Nhập / Xuất":
 
         cursor.execute(
             "INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
-            (sku, type_tx, qty, datetime.now(), wh, note)
+            (sku, type_tx, qty, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), wh, note)
         )
 
         conn.commit()
@@ -401,7 +401,7 @@ elif menu == "Chuyển kho":
             cursor.execute("INSERT INTO inventory(sku,warehouse,quantity) VALUES (?,?,?)", (sku,to_wh,qty))
 
         cursor.execute("INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
-                       (sku,"Chuyển",qty,datetime.now(),from_wh,f"→ {to_wh}"))
+                       (sku,"Chuyển",qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),from_wh,f"→ {to_wh}"))
 
         conn.commit()
         st.success("Chuyển thành công")
@@ -445,20 +445,20 @@ elif menu == "Lịch sử":
     # ===== FILTER THEO NGÀY =====
     st.subheader("📅 Lọc theo ngày")
 
-    df["Thời gian"] = pd.to_datetime(df["Thời gian"])
+df["Thời gian"] = pd.to_datetime(df["Thời gian"])
 
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("Từ ngày")
-    with col2:
-        end_date = st.date_input("Đến ngày")
+col1, col2 = st.columns(2)
+with col1:
+    start_date = st.date_input("Từ ngày", value=None)
+with col2:
+    end_date = st.date_input("Đến ngày", value=None)
 
-    if start_date and end_date:
-        df = df[
-            (df["Thời gian"] >= pd.to_datetime(start_date)) &
-            (df["Thời gian"] <= pd.to_datetime(end_date))
-        ]
-
+# 👉 CHỈ lọc khi user thực sự chọn
+if start_date is not None and end_date is not None:
+    df = df[
+        (df["Thời gian"] >= pd.to_datetime(start_date)) &
+        (df["Thời gian"] <= pd.to_datetime(end_date))
+    ]
     # ===== HIỂN THỊ =====
     st.subheader("📋 Chi tiết giao dịch")
     st.dataframe(df, use_container_width=True)
