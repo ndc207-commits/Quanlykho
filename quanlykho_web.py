@@ -36,6 +36,14 @@ warehouse TEXT,
 note TEXT
 );
 
+CREATE TABLE IF NOT EXISTS products(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+sku TEXT UNIQUE,
+name TEXT,
+created_at TEXT,
+is_active INTEGER DEFAULT 1
+);
+
 CREATE TABLE IF NOT EXISTS warehouses(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 name TEXT
@@ -60,7 +68,7 @@ if cursor.fetchone()[0] == 0:
 
 # ================= HELPERS =================
 def get_products():
-    return pd.read_sql("SELECT * FROM products", conn)
+    return pd.read_sql("SELECT * FROM products WHERE is_active=1", conn)
 
 def get_stock():
     return pd.read_sql("""
@@ -69,6 +77,7 @@ def get_stock():
     COALESCE(i.quantity,0) as quantity
     FROM products p
     LEFT JOIN inventory i ON p.sku=i.sku
+    WHERE p.is_active=1
     """, conn)
 
 def get_warehouses():
@@ -87,6 +96,7 @@ menu = st.sidebar.radio("DANH MUC",[
     "Dashboard",
     "Tồn kho",
     "Thêm sản phẩm",
+    "Sửa / Xóa sản phẩm",
     "Nhập / Xuất",
     "Chuyển kho",
     "Báo cáo",
@@ -170,6 +180,85 @@ elif menu == "Thêm sản phẩm":
             st.rerun()
         except:
             st.error("SKU đã tồn tại")
+
+
+# ================= SUA / XOA =================
+elif menu == "Sửa / Xóa sản phẩm":
+
+    st.header("✏️ Sửa / 🗑️ Xóa sản phẩm")
+
+    df = get_products()
+
+    if df.empty:
+        st.warning("Chưa có sản phẩm")
+        st.stop()
+
+    df["display"] = df["sku"] + " - " + df["name"]
+
+    selected = st.selectbox("Chọn sản phẩm", df["display"])
+    sku = safe_get_sku(df, selected)
+
+    product = df[df["sku"] == sku].iloc[0]
+
+    # ===== SUA =====
+    st.subheader("✏️ Sửa thông tin")
+
+    new_name = st.text_input("Tên mới", value=product["name"])
+
+    if st.button("Cập nhật"):
+        cursor.execute(
+            "UPDATE products SET name=? WHERE sku=?",
+            (new_name, sku)
+        )
+        conn.commit()
+        st.success("Đã cập nhật")
+        st.rerun()
+
+    st.divider()
+
+    # ===== XOA =====
+    st.subheader("🗑️ Xóa sản phẩm")
+
+    confirm = st.checkbox("Xác nhận xóa sản phẩm này")
+
+    if st.button("Xóa"):
+        if not confirm:
+            st.warning("Hãy xác nhận trước khi xóa")
+            st.stop()
+
+        # xóa liên quan
+        cursor.execute(
+    "UPDATE products SET is_active=0 WHERE sku=?",
+    (sku,)
+)
+
+        conn.commit()
+
+        st.success("Đã xóa sản phẩm")
+        st.rerun()
+
+st.subheader("🔁 Đổi SKU")
+
+new_sku = st.text_input("SKU mới", value=sku)
+
+if st.button("Đổi SKU"):
+    if not new_sku:
+        st.warning("SKU không được trống")
+        st.stop()
+
+    try:
+        # update toàn bộ hệ thống
+        cursor.execute("UPDATE products SET sku=? WHERE sku=?", (new_sku, sku))
+        cursor.execute("UPDATE inventory SET sku=? WHERE sku=?", (new_sku, sku))
+        cursor.execute("UPDATE history SET sku=? WHERE sku=?", (new_sku, sku))
+
+        conn.commit()
+
+        st.success("Đổi SKU thành công")
+        st.rerun()
+
+    except:
+        st.error("SKU mới đã tồn tại")
 
 # ================= NHẬP XUẤT =================
 elif menu == "Nhập / Xuất":
