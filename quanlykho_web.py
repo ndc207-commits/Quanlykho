@@ -4,16 +4,16 @@ st.rerun()
 # ================= BÁO CÁO =================
 elif menu == "Báo cáo":
 
-    st.header("⚠️ Hàng sắp hết")
+ st.header("⚠️ Hàng sắp hết")
 
-    df = get_stock()
+ df = get_stock()
 
-    limit = st.number_input("Ngưỡng", value=5)
+ limit = st.number_input("Ngưỡng", value=5)
 
-    low = df[df["quantity"] < limit]
-    low.columns = ["SKU","Tên","Kho","Số lượng"]
+ low = df[df["quantity"] < limit]
+low.columns = ["SKU","Tên","Kho","Số lượng"]
 
-    st.dataframe(low)
+st.dataframe(low)
 
 # ================= LỊCH SỬ =================
 elif menu == "Lịch sử":
