@@ -1,5 +1,5 @@
 import streamlit as st
-        st.rerun()
+st.rerun()
 
 # ================= BÁO CÁO =================
 elif menu == "Báo cáo":
