@@ -417,7 +417,6 @@ elif menu == "Chuyển kho":
         st.success("Chuyển thành công")
         st.rerun()
 
-# ================= BÁO CÁO =================
 elif menu == "Báo cáo":
 
     st.header("⚠️ Hàng sắp hết")
@@ -426,10 +425,20 @@ elif menu == "Báo cáo":
 
     limit = st.number_input("Ngưỡng", value=5)
 
-    low = df[df["quantity"] < limit]
-    low.columns = ["SKU","Tên","Kho","Số lượng"]
+    df.columns = ["SKU","Tên","Kho","Số lượng"]
 
-    st.dataframe(low)
+    # ===== HIGHLIGHT =====
+    def highlight_low(row):
+    if row["Số lượng"] < limit:
+        return ['background-color: #ff4d4d'] * len(row)  # đỏ
+    elif row["Số lượng"] < limit * 2:
+        return ['background-color: #fff3cd'] * len(row)  # vàng
+    else:
+        return [''] * len(row)
+
+    styled_df = df.style.apply(highlight_low, axis=1)
+
+    st.dataframe(styled_df, use_container_width=True)
 
 # ================= LỊCH SỬ =================
 elif menu == "Lịch sử":
