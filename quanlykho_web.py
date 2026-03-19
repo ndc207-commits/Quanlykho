@@ -22,6 +22,19 @@ CREATE TABLE IF NOT EXISTS products(
     is_active INTEGER DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS users(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    password TEXT,
+    role TEXT,
+    store TEXT
+);
+
+CREATE TABLE IF NOT EXISTS stores(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT
+);
+
 CREATE TABLE IF NOT EXISTS inventory(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sku TEXT,
@@ -71,6 +84,29 @@ if cursor.fetchone()[0] == 0:
     )
     conn.commit()
 
+# ===== STORES =====
+cursor.execute("SELECT COUNT(*) FROM stores")
+if cursor.fetchone()[0] == 0:
+    cursor.executemany(
+        "INSERT INTO stores(name) VALUES (?)",
+        [("Muse",), ("Metz Ville",), ("Nancy",)]
+    )
+
+# ===== USERS =====
+cursor.execute("SELECT COUNT(*) FROM users")
+if cursor.fetchone()[0] == 0:
+    cursor.executemany(
+        "INSERT INTO users(username,password,role,store) VALUES (?,?,?,?)",
+        [
+            ("admin","admin123","admin","ALL"),
+            ("muse","123","staff","Muse"),
+            ("metz","123","staff","Metz Ville"),
+            ("nancy","123","staff","Nancy")
+        ]
+    )
+
+conn.commit()
+
 # ================= HELPERS =================
 def get_products():
     return pd.read_sql("SELECT * FROM products WHERE is_active=1", conn)
@@ -93,6 +129,33 @@ def safe_get_sku(df, display):
     if row.empty:
         return None
     return row.iloc[0]["sku"]
+
+
+# ================= LOGIN =================
+def login(u,p):
+    cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (u,p))
+    return cursor.fetchone()
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+if not st.session_state.user:
+    st.title("🔐 Login")
+    u = st.text_input("Username")
+    p = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        user = login(u,p)
+        if user:
+            st.session_state.user = user
+            st.rerun()
+        else:
+            st.error("Sai tài khoản")
+    st.stop()
+
+user = st.session_state.user
+role = user[3]
+store_user = user[4]
 
 # ================= UI =================
 st.sidebar.title("📦 QUẢN LÝ KHO AMME THE")
@@ -259,9 +322,20 @@ elif menu == "Nhập / Xuất":
 
     type_tx = st.radio("Loại", ["Nhập", "Xuất"])
 
+   # 👇 THÊM
+    def get_stores():
+        return [x[0] for x in cursor.execute("SELECT name FROM stores")]
+
     destination = ""
+
     if type_tx == "Xuất":
-        destination = st.text_input("Xuất đến (cửa hàng)")
+        if role == "admin":
+            destination = st.selectbox("Xuất đến", get_stores())
+    else:
+        destination = store_user
+        st.info(f"Xuất cho: {destination}")
+    
+        
 
     if st.button("Xác nhận"):
 
@@ -328,8 +402,16 @@ elif menu == "Chuyển kho":
         else:
             cursor.execute("INSERT INTO inventory(sku,warehouse,quantity) VALUES (?,?,?)", (sku,to_wh,qty))
 
-        cursor.execute("INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
-                       (sku,"Chuyển",qty,datetime.now().strftime("%Y-%m-%d %H:%M:%S"),from_wh,f"→ {to_wh}"))
+        # xác định shop
+        store = store_user if role != "admin" else "Chuyển kho"
+
+        cursor.execute(
+            "INSERT INTO history(sku,type,quantity,date,warehouse,note) VALUES (?,?,?,?,?,?)",
+            (sku,"Chuyển",qty,
+         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+         from_wh,
+         f"{store} → {to_wh}")
+)
 
         conn.commit()
         st.success("Chuyển thành công")
@@ -394,6 +476,8 @@ elif menu == "Lịch sử":
 
         st.dataframe(summary)
         st.bar_chart(summary.set_index("Cửa hàng"))
+    if role != "admin":
+    df = df[df["Ghi chú"] == store_user]
 
 # ================= EXPORT =================
 elif menu == "Xuất Excel":
