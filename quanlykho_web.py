@@ -477,7 +477,7 @@ elif menu == "Lịch sử":
         st.dataframe(summary)
         st.bar_chart(summary.set_index("Cửa hàng"))
     if role != "admin":
-    df = df[df["Ghi chú"] == store_user]
+        df = df[df["Ghi chú"] == store_user]
 
 # ================= EXPORT =================
 elif menu == "Xuất Excel":
