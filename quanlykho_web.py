@@ -429,12 +429,12 @@ elif menu == "Báo cáo":
 
     # ===== HIGHLIGHT =====
     def highlight_low(row):
-    if row["Số lượng"] < limit:
-        return ['background-color: #ff4d4d'] * len(row)  # đỏ
-    elif row["Số lượng"] < limit * 2:
-        return ['background-color: #fff3cd'] * len(row)  # vàng
-    else:
-        return [''] * len(row)
+        if row["Số lượng"] < limit:
+            return ['background-color: #ff4d4d'] * len(row)  # đỏ
+        elif row["Số lượng"] < limit * 2:
+            return ['background-color: #fff3cd'] * len(row)  # vàng
+        else:
+            return [''] * len(row)
 
     styled_df = df.style.apply(highlight_low, axis=1)
 
