@@ -5,7 +5,7 @@ import os
 from sqlalchemy import create_engine, text
 
 # ================= CONFIG =================
-DB_URL = os.environ.get("DB_URL")
+DB_URL = "postgresql://postgres:Nhutren9989@db.acwzgbfrlqykqlhanfdi.supabase.co:5432/postgres"
 engine = create_engine(DB_URL, pool_pre_ping=True)
 
 # ================= DB HELPERS =================
