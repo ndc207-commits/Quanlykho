@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 
 # ================= CONFIG =================
-DB_URL = "postgresql://postgres:Nhutren9989@db.acwzgbfrlqykqlhanfdi.supabase.co:5432/postgres"
+DB_URL = "postgresql://postgres.acwzgbfrlqykqlhanfdi:Nhutren9989@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
 engine = create_engine(DB_URL, pool_pre_ping=True)
 
 # ================= DB HELPERS =================
