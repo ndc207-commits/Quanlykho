@@ -331,7 +331,7 @@ elif menu == "Nhập / Xuất":
     if type_tx == "Xuất":
         if role == "admin":
             destination = st.selectbox("Xuất đến", get_stores())
-    else:
+        else:
         destination = store_user
         st.info(f"Xuất cho: {destination}")
     
@@ -475,6 +475,8 @@ elif menu == "Lịch sử":
             (df["Thời gian"] <= pd.to_datetime(end_date))
         ]
 
+    if role != "admin":
+        df = df[df["Ghi chú"] == store_user]
     st.dataframe(df, use_container_width=True)
 
     df_xuat = df[df["Loại"] == "Xuất"]
@@ -485,8 +487,7 @@ elif menu == "Lịch sử":
 
         st.dataframe(summary)
         st.bar_chart(summary.set_index("Cửa hàng"))
-    if role != "admin":
-        df = df[df["Ghi chú"] == store_user]
+    
 
 # ================= EXPORT =================
 elif menu == "Xuất Excel":
