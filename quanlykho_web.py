@@ -332,8 +332,8 @@ elif menu == "Nhập / Xuất":
         if role == "admin":
             destination = st.selectbox("Xuất đến", get_stores())
         else:
-        destination = store_user
-        st.info(f"Xuất cho: {destination}")
+            destination = store_user
+            st.info(f"Xuất cho: {destination}")
     
         
 
